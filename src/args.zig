@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 
 const BaseType = @import("base_type.zig").BaseType;
+const Verbosity = @import("verbosity.zig").Verbosity;
 const errors = @import("errors.zig");
 
 const io = std.io;
@@ -16,9 +17,9 @@ pub const Args = struct {
     screensaver: bool = false,
     printTree: bool = false,
     /// TODO: Should be an enum with 3 levels
-    verbosity: i32,
+    verbosity: Verbosity,
     lifeStart: usize = 32,
-    multiplier: usize,
+    multiplier: usize = 5,
     /// TODO: Should be an enum with 3 choices
     /// none, small, large
     baseType: BaseType,
@@ -47,25 +48,25 @@ pub const Args = struct {
             \\
             \\-i, --infinite            Infinite mode: keep growing trees.
             \\-w, --wait <TIME>         In infinite mode, wait TIME between each tree
-            \\                          generation [default: 4.00].
+            \\                              generation [default: 4.00].
             \\
             \\-S, --screensaver         Screensaver mode; equivalent to -liWC and
-            \\                          quit on any keypress.
+            \\                              quit on any keypress.
             \\
             \\-m, --message <STR>       Attach message next to the tree.
-            \\-b, --base <BASETYPE>          Ascii-art plant base to use, 0 is none.
+            \\-b, --base <BASETYPE>     Ascii-art plant base to use, 0 is none.
             \\-c, --leaf <STR>          List of comma-delimited strings randomly chosen
             \\                          for leaves.
             \\
-            \\-M, --multiplier <USIZE>    Branch multiplier; higher -> more
-            \\                          branching (0-20) [default: 5].
+            \\-M, --multiplier <USIZE>  Branch multiplier; higher -> more
+            \\                              branching (0-20) [default: 5].
             \\
-            \\-L, --life <USIZE>          Life; higher -> more growth (0-200) [default: 32].
+            \\-L, --life <USIZE>        Life; higher -> more growth (0-200) [default: 32].
             \\-p, --print               Print tree to terminal when finished.
             \\-s, --seed <U64>          Seed random number generator.
             \\-W, --save <FILE>         Save progress to file [default: ~/.cache/cbonsai].
             \\-C, --load <FILE>         Load progress from file [default: ~/.cache/cbonsai].
-            \\-v, --verbose             Increase output verbosity.
+            \\-v, --verbose <VERBOSITY> Increase output verbosity.
             \\<FILE>...
             \\
         );
@@ -80,6 +81,7 @@ pub const Args = struct {
             .USIZE = clap.parsers.int(usize, 10),
             .TIME = clap.parsers.float(f32),
             .BASETYPE = clap.parsers.enumeration(BaseType),
+            .VERBOSITY = clap.parsers.enumeration(Verbosity),
         };
 
         var diag = clap.Diagnostic{};
@@ -139,13 +141,17 @@ pub const Args = struct {
             load = true;
         }
 
+        var verbosity = Verbosity.none;
+        if (res.args.verbose) |v|
+            verbosity = v;
+
         return Args{
             .allocator = ally,
             .live = res.args.live != 0,
             .infinite = res.args.infinite != 0,
             .screensaver = res.args.screensaver != 0,
             .printTree = res.args.print != 0,
-            .verbosity = 0,
+            .verbosity = verbosity,
             .lifeStart = lifeStart,
             .multiplier = multiplier,
             .baseType = baseType,

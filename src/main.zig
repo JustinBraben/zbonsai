@@ -170,6 +170,8 @@ const App = struct {
         var myCounters = std.mem.zeroes(Counters);
         // _ = &myCounters;
 
+        var pass_finished = false;
+
         // This is the main event loop. The basic structure is
         // 1. Handle events
         // 2. Draw application
@@ -189,22 +191,27 @@ const App = struct {
             //     try self.drawConfig();
             // }
 
-            try self.drawWins();
-
-            try self.growTree(&myCounters);
+            if (!pass_finished) {
+                const win = self.vx.window();
+                win.clear();
+                try self.drawWins();
+                try self.growTree(&myCounters);
+                pass_finished = true;
+            }
 
             // It's best to use a buffered writer for the render method. TTY provides one, but you
             // may use your own. The provided bufferedWriter has a buffer size of 4096
             var buffered = self.tty.bufferedWriter();
             // Render the application to the screen
             try self.vx.render(buffered.writer().any());
+            try buffered.flush();
 
             // Should quit after one run
             // self.should_quit = true;
 
-            if (!self.args.printTree){
-                try buffered.flush();
-            }   
+            // if (!self.args.printTree){
+            //     try buffered.flush();
+            // }   
         }
     }
 
@@ -441,12 +448,6 @@ const App = struct {
 
         // recursively grow tree trunk and branches
 	    try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
-
-        // if live, update screen
-        // skip updating if we're still loading from file
-        if (self.args.live and !(self.args.load and myCounters.*.branches < self.args.targetBranchCount)) {
-            try self.updateScreen(self.args.timeStep);
-        }
     }
 
     fn branch(self: *App, myCounters: *Counters, x_input: usize, y_input: usize, branch_type_input: branchType, life_input: usize) !void {
@@ -462,22 +463,25 @@ const App = struct {
         var shootCooldown = self.args.multiplier;
 
         while (life > 0) {
-            // Use the loop to check for key presses here. And set up exit if necessary
-
+            // decrement remaining life counter
             life -|= 1;
-            age = self.args.lifeStart - life;
+            age = self.args.lifeStart -| life;
 
             self.setDeltas(branch_type, life, age, self.args.multiplier, &dx, &dy);
 
             const maxY = self.getTreeWinMaxY();
+            // reduce dy if too close to the ground
             if (dy > 0 and y > (maxY -| 2)) dy -= 1;
 
+            // near-dead branch should branch into a lot of leaves
             if (life < 3) {
                 try self.branch(myCounters, x, y, .dead, life);
             }
+            // // dying trunk should branch into a lot of leaves
             // else if (branch_type == .trunk and life < (self.args.multiplier +| 2)) {
             //     try self.branch(myCounters, x, y, .dying, life);
             // }
+            // // dying shoot should branch into a lot of leaves
             // else if ((branch_type == .shootLeft or branch_type == .shootRight) and life < (self.args.multiplier +| 2)){
             //     try self.branch(myCounters, x, y, .dying, life);
             // }
@@ -500,6 +504,27 @@ const App = struct {
 
             shootCooldown -|= 1;
 
+            const win = self.vx.window();
+
+            if (self.args.verbosity != .none) {
+                const msg = try std.fmt.allocPrint(self.arena.allocator(), 
+                \\dx: {d}
+                    \\dy: {d}
+                    \\type: {s}
+                    \\shootCooldown: {d}
+                , 
+                .{dx, dy, @tagName(branch_type), shootCooldown});
+                const verbose_child = win.child(.{
+                    .x_off = 5,
+                    .y_off = 2,
+                    .width = .{ .limit = 30},
+                    .height = .{ .limit = 4},
+                });
+                verbose_child.clear();
+
+                _ = try verbose_child.printSegment(.{ .text = msg }, .{});
+            }
+
             // move in x and y directions
             if (@as(usize, @intCast(@abs(dx))) > x) {
                 x = 0;
@@ -519,10 +544,8 @@ const App = struct {
             // branch_type = self.chooseColor(branch_type);
             _ = &branch_type;
 
-            // const branch_str = try self.chooseString(branch_type, life, dx, dy);
-            const branch_str = "/|";
-            
-            const win = self.vx.window();
+            const branch_str = try self.chooseString(branch_type, life, dx, dy);
+            // const branch_str = "/|";
 
             const x_pos = x;
             const y_pos = y;
@@ -535,12 +558,18 @@ const App = struct {
             });
 
             _ = try tree_child.printSegment(.{ .text = branch_str, .style = Styles.tree_base_style}, .{});
+
+            // if live, update screen
+            // skip updating if we're still loading from file
+            if (self.args.live and !(self.args.load and myCounters.*.branches < self.args.targetBranchCount)) {
+                try self.updateScreen(self.args.timeStep);
+            }
         }
     }
 
     fn setDeltas(self: *App, branch_type: branchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
-        var dx: i64 = 0;
-        var dy: i64 = 0;
+        // var dx: i64 = 0;
+        // var dy: i64 = 0;
         var dice: i64 = 0;
 
         switch (branch_type) {
@@ -548,8 +577,8 @@ const App = struct {
                 
                 // new or dead trunk
                 if (age <= 2 or life < 4) {
-                    dy = 0;
-                    dx = self.rand.random().intRangeLessThan(i64, -1, 2);
+                    returnDy.* = 0;
+                    returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
                 }
                 // young trunk should grow wide
                 else if (age < (multiplier * 3)) {
@@ -557,112 +586,171 @@ const App = struct {
                     const res = @as(f32, @floatFromInt(multiplier)) * 0.5;
 
                     // every (multiplier * 0.8) steps, raise tree to next level
-                    if (age % @as(usize, @intFromFloat(res)) == 0) dy = -1 else dy = 0;
+                    if (age % @as(usize, @intFromFloat(res)) == 0) returnDy.* = -1 else returnDy.* = 0;
 
                     self.roll(&dice, 10);
-                    if (dice >= 0 and dice <= 0) { dx = -2; }
-                    else if (dice >= 1 and dice <= 3) { dx = -1; }
-                    else if (dice >= 4 and dice <= 5) { dx = 0; }
-                    else if (dice >= 6 and dice <= 8) { dx = 1; }
-                    else if (dice >= 9 and dice <= 9) { dx = 2; }
+                    if (dice >= 0 and dice <= 0) { returnDx.* = -2; }
+                    else if (dice >= 1 and dice <= 3) { returnDx.* = -1; }
+                    else if (dice >= 4 and dice <= 5) { returnDx.* = 0; }
+                    else if (dice >= 6 and dice <= 8) { returnDx.* = 1; }
+                    else if (dice >= 9 and dice <= 9) { returnDx.* = 2; }
                 }
                 // middle-age trunk
                 else {
                     self.roll(&dice, 10);
-                    if (dice > 2) { dy = -1; }
-                    else { dy = 0; }
-                    dx = self.rand.random().intRangeLessThan(i64, -1, 2);
+                    if (dice > 2) { returnDy.* = -1; }
+                    else { returnDy.* = 0; }
+                    returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
                 }
             },
             // trend left and a little vertical movement
             .shootLeft => {
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 1) { dy = -1; }
-                else if (dice >= 2 and dice <= 7) { dy = 0; }
-                else if (dice >= 8 and dice <= 9) { dy = 1; }
+                if (dice >= 0 and dice <= 1) { returnDy.* = -1; }
+                else if (dice >= 2 and dice <= 7) { returnDy.* = 0; }
+                else if (dice >= 8 and dice <= 9) { returnDy.* = 1; }
 
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 1) { dx = -2; }
-                else if (dice >= 2 and dice <= 5) { dx = -1; }
-                else if (dice >= 6 and dice <= 8) { dy = 0; }
-                else if (dice >= 9 and dice <= 9) { dx = 1; }
+                if (dice >= 0 and dice <= 1) { returnDx.* = -2; }
+                else if (dice >= 2 and dice <= 5) { returnDx.* = -1; }
+                else if (dice >= 6 and dice <= 8) { returnDx.* = 0; }
+                else if (dice >= 9 and dice <= 9) { returnDx.* = 1; }
             },
-            // tren right and a little vertical movement
+            // trend right and a little vertical movement
             .shootRight => {
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 1) { dy = -1; }
-                else if (dice >= 2 and dice <= 7) { dy = 0; }
-                else if (dice >= 8 and dice <= 9) { dy = 1; }
+                if (dice >= 0 and dice <= 1) { returnDy.* = -1; }
+                else if (dice >= 2 and dice <= 7) { returnDy.* = 0; }
+                else if (dice >= 8 and dice <= 9) { returnDy.* = 1; }
 
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 1) { dx = 2; }
-                else if (dice >= 2 and dice <= 5) { dx = 1; }
-                else if (dice >= 6 and dice <= 8) { dy = 0; }
-                else if (dice >= 9 and dice <= 9) { dx = -1; }
+                if (dice >= 0 and dice <= 1) { returnDx.* = 2; }
+                else if (dice >= 2 and dice <= 5) { returnDx.* = 1; }
+                else if (dice >= 6 and dice <= 8) { returnDx.* = 0; }
+                else if (dice >= 9 and dice <= 9) { returnDx.* = -1; }
             },
             // discourage vertical growth(?); trend left/right (-3,3)
             .dying => {
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 1) { dy = -1; }
-                else if (dice >= 2 and dice <= 8) { dy = 0; }
-                else if (dice >= 9 and dice <= 9) { dy = 1; }
+                if (dice >= 0 and dice <= 1) { returnDy.* = -1; }
+                else if (dice >= 2 and dice <= 8) { returnDy.* = 0; }
+                else if (dice >= 9 and dice <= 9) { returnDy.* = 1; }
 
                 self.roll(&dice, 15);
-                if (dice >= 0 and dice <= 0) { dx = -3; }
-                else if (dice >= 1 and dice <= 2) { dx = -2; }
-                else if (dice >= 3 and dice <= 5) { dy = 1; }
-                else if (dice >= 6 and dice <= 8) { dx = 0; }
-                else if (dice >= 9 and dice <= 11) { dx = 1; }
-                else if (dice >= 12 and dice <= 13) { dx = 2; }
-                else if (dice >= 14 and dice <= 14) { dx = 3; }
+                if (dice >= 0 and dice <= 0) { returnDx.* = -3; }
+                else if (dice >= 1 and dice <= 2) { returnDx.* = -2; }
+                else if (dice >= 3 and dice <= 5) { returnDx.* = 1; }
+                else if (dice >= 6 and dice <= 8) { returnDx.* = 0; }
+                else if (dice >= 9 and dice <= 11) { returnDx.* = 1; }
+                else if (dice >= 12 and dice <= 13) { returnDx.* = 2; }
+                else if (dice >= 14 and dice <= 14) { returnDx.* = 3; }
             },
             .dead => {
                 self.roll(&dice, 10);
-                if (dice >= 0 and dice <= 2) { dy = -1; }
-                else if (dice >= 3 and dice <= 6) { dy = 0; }
-                else if (dice >= 7 and dice <= 9) { dy = 1; }
-                dx = self.rand.random().intRangeLessThan(i64, -1, 2);
+                if (dice >= 0 and dice <= 2) { returnDy.* = -1; }
+                else if (dice >= 3 and dice <= 6) { returnDy.* = 0; }
+                else if (dice >= 7 and dice <= 9) { returnDy.* = 1; }
+                returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
             }
         }
 
-        returnDx.* = dx;
-        returnDy.* = dy;
+        // returnDx.* = dx;
+        // returnDy.* = dy;
     }
 
     fn chooseString(self: *App, branch_type_input: branchType, life: usize, dx: i64, dy: i64) ![]const u8 {
         var branch_type = branch_type_input;
 
+        const default = "?";
         const max_str_len: usize = 32;
         var branch_str: []u8 = undefined;
-        branch_str = try self.arena.allocator().alloc(u8, max_str_len);
+        branch_str = try self.arena.allocator().alloc(u8, default.len);
         std.mem.copyForwards(u8, branch_str, "?");
 
         if (life < 4) branch_type = .dying;
 
         switch (branch_type) {
             .trunk => {
-                if (dy == 0) { std.mem.copyForwards(u8, branch_str, "/~"); }
-                else if (dx < 0) { std.mem.copyForwards(u8, branch_str, "\\|"); }
-                else if (dx == 0) { std.mem.copyForwards(u8, branch_str, "/|\\"); }
-                else if (dx > 0) { std.mem.copyForwards(u8, branch_str, "|/"); }
+                if (dy == 0) {
+                    const str = "/~";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx < 0) {
+                    const str = "\\|";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx == 0) {
+                    const str = "/|\\";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx > 0) {
+                    const str = "|/";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
             },
             .shootLeft => {
-                if (dy > 0) { std.mem.copyForwards(u8, branch_str, "\\"); }
-                else if (dy == 0) { std.mem.copyForwards(u8, branch_str, "\\_"); }
-                else if (dx < 0) { std.mem.copyForwards(u8, branch_str, "\\|"); }
-                else if (dx == 0) { std.mem.copyForwards(u8, branch_str, "/|"); }
-                else if (dx > 0) { std.mem.copyForwards(u8, branch_str, "/"); }
+                if (dy > 0) {
+                    const str = "\\";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dy == 0) {
+                    const str = "\\_";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, "\\_");
+                }
+                else if (dx < 0) {
+                    const str = "\\|";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx == 0) {
+                    const str = "/|";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx > 0) {
+                    const str = "/";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
             },
             .shootRight => {
-                if (dy > 0) { std.mem.copyForwards(u8, branch_str, "/"); }
-                else if (dy == 0) { std.mem.copyForwards(u8, branch_str, "_/"); }
-                else if (dx < 0) { std.mem.copyForwards(u8, branch_str, "\\|"); }
-                else if (dx == 0) { std.mem.copyForwards(u8, branch_str, "/|"); }
-                else if (dx > 0) { std.mem.copyForwards(u8, branch_str, "/"); }
+                if (dy > 0) {
+                    const str = "/";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dy == 0) {
+                    const str = "_/";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx < 0) {
+                    const str = "\\|";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx == 0) {
+                    const str = "/|";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
+                else if (dx > 0) {
+                    const str = "/";
+                    branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                    std.mem.copyForwards(u8, branch_str, str);
+                }
             },
             .dying, .dead => {
                 const rand_index = self.rand.random().intRangeLessThan(usize, 0, max_str_len);
-                std.mem.copyForwards(u8, branch_str, self.args.leaves[0..rand_index]);
+                const str = self.args.leaves[0..rand_index];
+                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
+                std.mem.copyForwards(u8, branch_str, str);
             }
 
         }
