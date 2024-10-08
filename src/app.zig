@@ -132,5 +132,5 @@ pub fn update(self: *App, event: Event) !void {
 pub fn draw(self: *App) !void {
     const win = self.vx.window();
     const msg = "Hello";
-    _ = try win.printSegment(.{.text = msg}, .{});
+    _ = try win.printSegment(.{ .text = msg }, .{});
 }

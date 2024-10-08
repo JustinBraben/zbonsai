@@ -24,9 +24,9 @@ pub const Args = struct {
     /// none, small, large
     baseType: BaseType,
     seed: u64,
-    leavesSize: i32,
+    leavesSize: usize = 0,
     targetBranchCount: usize = 0,
-    
+
     timeWait: f32,
     timeStep: f32,
 
@@ -93,7 +93,7 @@ pub const Args = struct {
             return err;
         };
         defer res.deinit();
-        
+
         if (res.args.help != 0) {
             try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
             return errors.ControlledExit.Help;
@@ -102,11 +102,11 @@ pub const Args = struct {
         var multiplier: usize = 5;
         if (res.args.multiplier) |m|
             multiplier = m;
-        
+
         var message: ?[]const u8 = null;
         if (res.args.message) |msg|
             message = msg;
-        
+
         var baseType: BaseType = .large;
         if (res.args.base) |bs|
             baseType = bs;
@@ -118,11 +118,11 @@ pub const Args = struct {
         var seed: u64 = 0;
         if (res.args.seed) |s|
             seed = s;
-        
+
         var timeStep: f32 = 0.03;
         if (res.args.time) |ts|
             timeStep = ts;
-        
+
         var save = false;
         var saveFile = try createDefaultCachePath(ally);
         if (res.args.save) |save_file| {
@@ -186,10 +186,10 @@ pub const Args = struct {
     }
 
     fn saveToFile(ally: Allocator, file_name: []const u8, seed: u64, branchCount: u64) !void {
-        const file = try std.fs.cwd().createFile(file_name, .{.read = true });
+        const file = try std.fs.cwd().createFile(file_name, .{ .read = true });
         defer file.close();
 
-        _ = try file.writeAll(std.fmt.allocPrint(ally, "{d} {d}", .{seed, branchCount}));
+        _ = try file.writeAll(std.fmt.allocPrint(ally, "{d} {d}", .{ seed, branchCount }));
     }
 
     fn loadFromFile(file_name: []const u8) !void {
@@ -201,7 +201,7 @@ pub const Args = struct {
         _ = try file.readAll(&buffer);
 
         // var tokens = std.mem.tokenizeAny(u8, &buffer, " ");
-        
+
         // self.args.seed = std.fmt.parseInt(usize, tokens.next());
     }
 };
