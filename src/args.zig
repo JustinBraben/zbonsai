@@ -94,7 +94,6 @@ pub const Args = struct {
 
         if (res.args.help != 0) {
             try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
-            // return errors.ControlledExit.Help;
         }
 
         var multiplier: usize = 5;
@@ -188,6 +187,7 @@ pub const Args = struct {
         return res;
     }
 
+    // TODO: implement saveToFile
     fn saveToFile(ally: Allocator, file_name: []const u8, seed: u64, branchCount: u64) !void {
         const file = try std.fs.cwd().createFile(file_name, .{ .read = true });
         defer file.close();
@@ -195,6 +195,7 @@ pub const Args = struct {
         _ = try file.writeAll(std.fmt.allocPrint(ally, "{d} {d}", .{ seed, branchCount }));
     }
 
+    // TODO: implement loadFromFile
     fn loadFromFile(file_name: []const u8) !void {
         const file = try std.fs.cwd().openFile(file_name, .{});
         defer file.close();

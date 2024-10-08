@@ -9,6 +9,7 @@ const builtin = std.builtin;
 const BaseType = @import("base_type.zig").BaseType;
 const Styles = @import("styles.zig");
 const Args = @import("args.zig").Args;
+const Dice = @import("dice.zig").Dice;
 
 const vaxis = @import("vaxis");
 const clap = @import("clap");
@@ -103,19 +104,12 @@ const App = struct {
     }
 
     pub fn deinit(self: *App) void {
-        // Deinit takes an optional allocator. You can choose to pass an allocator to clean up
-        // memory, or pass null if your application is shutting down and let the OS clean up the
-        // memory
+        self.vx.deinit(self.allocator, self.tty.anyWriter());
+        self.tty.deinit();
 
-        if (!self.args.printTree) {
-            self.vx.deinit(self.allocator, self.tty.anyWriter());
-            self.tty.deinit();
-        } else {
-            var buffered = self.tty.bufferedWriter();
-            self.vx.render(buffered.writer().any()) catch {};
-            self.vx.resetState(self.tty.anyWriter()) catch {};
-            self.tty.deinit();
-        }
+        // TODO: if printTree is set, print the final product of the tree
+        // to the terminal window. Give back user access
+        // if (!self.args.printTree) {}
     }
 
     pub fn run(self: *App) !void {
@@ -141,10 +135,7 @@ const App = struct {
 
         var pass_finished = false;
 
-        // This is the main event loop. The basic structure is
-        // 1. Handle events
-        // 2. Draw application
-        // 3. Render
+        // Main event loop
         while (!self.should_quit) {
             // pollEvent blocks until we have an event
             loop.pollEvent();
@@ -572,7 +563,7 @@ const App = struct {
                 else if (age < (multiplier * 3)) {
                     const res = @as(f32, @floatFromInt(multiplier)) * 0.5;
 
-                    // every (multiplier * 0.8) steps, raise tree to next level
+                    // every (multiplier * 0.5) steps, raise tree to next level
                     if (age % @as(usize, @intFromFloat(res)) == 0) returnDy.* = -1 else returnDy.* = 0;
 
                     self.roll(&dice, 10);
