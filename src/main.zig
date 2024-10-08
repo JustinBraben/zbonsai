@@ -9,9 +9,9 @@ const builtin = std.builtin;
 const BaseType = @import("base_type.zig").BaseType;
 const Styles = @import("styles.zig");
 const Args = @import("args.zig").Args;
-const errors = @import("errors.zig");
 
 const vaxis = @import("vaxis");
+const clap = @import("clap");
 
 const branchType = enum { trunk, shootLeft, shootRight, dying, dead };
 
@@ -51,19 +51,18 @@ const Event = union(enum) {
 };
 
 pub fn main() !void {
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer {
-    //     const deinit_status = gpa.deinit();
-    //     //fail test; can't try in defer as defer is executed after we return
-    //     if (deinit_status == .leak) {
-    //         std.log.err("memory leak", .{});
-    //     }
-    // }
     const allocator = std.heap.c_allocator;
 
     var args = try Args.parse_args(allocator);
     defer args.deinit();
 
+    // If -h was passed help will be displayed
+    // program will exit gracefully
+    if (args.help) {
+        return;
+    }
+
+    // By default leaves will just be '&'
     var leavesInput = [_]u8{'&'} ** 128;
     var tokens = std.mem.tokenize(u8, &leavesInput, ",");
     while (tokens.next()) |token| {
@@ -73,15 +72,11 @@ pub fn main() !void {
         }
     }
 
+    // If seed is 0, assumed that no seed was passed
+    // thus give the program a seed based on timestamp
     if (args.seed == 0) {
         args.seed = @as(u64, @intCast(std.time.timestamp()));
     }
-
-    // print("args.lifeStart: {d}\n", .{args.lifeStart});
-    // print("args.timeStep: {d}\n", .{args.timeStep});
-
-    // var objects = vaxisObjects{};
-    // _ = &objects;
 
     // Initialize our application
     var app = try App.init(allocator, args);
@@ -104,18 +99,12 @@ const App = struct {
     vx: vaxis.Vaxis,
     /// A mouse event that we will handle in the draw cycle
     mouse: ?vaxis.Mouse,
+    /// Random number generator
     rand: std.rand.Xoshiro256,
+    /// Arguments passed in from command line
     args: Args,
 
     pub fn init(allocator: Allocator, args: Args) !App {
-        // var tty = try vaxis.Tty.init();
-        // var vx = try vaxis.init(allocator, .{});
-
-        // // Initialize our event loop. This particular loop requires intrusive init
-        // var loop: vaxis.Loop(Event) = .{
-        //     .tty = &tty,
-        //     .vaxis = &vx,
-        // };
         return .{
             .allocator = allocator,
             .arena = std.heap.ArenaAllocator.init(allocator),
@@ -143,7 +132,6 @@ const App = struct {
             self.vx.resetState(self.tty.anyWriter()) catch {};
             self.tty.deinit();
         }
-        // self.arena.deinit();
     }
 
     pub fn run(self: *App) !void {
@@ -169,7 +157,6 @@ const App = struct {
         try self.vx.setMouseMode(self.tty.anyWriter(), true);
 
         var myCounters = std.mem.zeroes(Counters);
-        // _ = &myCounters;
 
         var pass_finished = false;
 
@@ -185,13 +172,9 @@ const App = struct {
                 try self.update(event);
             }
 
-            // Draw our application after handling events
-            // try self.draw();
-
-            // if (self.show_config){
-            //     try self.drawConfig();
-            // }
-
+            // Resets window, draws the base of the tree
+            // then grows the tree. If -l passed it you will view
+            // generation live. Once the tree has finished growing it will no longer draw anymore
             if (!pass_finished) {
                 const win = self.vx.window();
                 win.clear();
@@ -206,13 +189,6 @@ const App = struct {
             // Render the application to the screen
             try self.vx.render(buffered.writer().any());
             try buffered.flush();
-
-            // Should quit after one run
-            // self.should_quit = true;
-
-            // if (!self.args.printTree){
-            //     try buffered.flush();
-            // }
         }
     }
 
@@ -226,12 +202,6 @@ const App = struct {
                 if (key.matches('c', .{ .ctrl = true })) {
                     self.should_quit = true;
                 }
-                // else if (key.matches('e', .{})){
-                //     self.show_config = true;
-                // }
-                // else if (key.matches('r', .{})){
-                //     self.show_config = false;
-                // }
             },
             .mouse => |mouse| self.mouse = mouse,
             .winsize => |ws| {
@@ -291,7 +261,6 @@ const App = struct {
 
     fn drawWins(self: *App) !void {
         try self.drawBase();
-        // try self.drawTree();
     }
 
     fn drawBase(self: *App) !void {
@@ -387,6 +356,7 @@ const App = struct {
         }
     }
 
+    /// Used to debug initial tree drawing placement
     fn drawTree(self: *App) !void {
         const win = self.vx.window();
 
@@ -433,6 +403,8 @@ const App = struct {
         }
     }
 
+    /// Gets the starting position to grow the tree,
+    /// calls self.branch which recursively draws the tree
     fn growTree(self: *App, myCounters: *Counters) !void {
         var maxX: usize = 0;
         var maxY: usize = 0;
@@ -448,6 +420,7 @@ const App = struct {
         try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
     }
 
+    /// Recursively draws the parts of the tree
     fn branch(self: *App, myCounters: *Counters, x_input: usize, y_input: usize, branch_type_input: branchType, life_input: usize) !void {
         var x = x_input;
         var y = y_input;
@@ -494,7 +467,13 @@ const App = struct {
                     myCounters.*.shoots +|= 1;
                     myCounters.*.shootCounter +|= 1;
 
-                    try self.branch(myCounters, x, y, .shootLeft, (life +| self.args.multiplier));
+                    // 50/50 branch shootLeft or shootRight
+                    if (self.rand.random().intRangeLessThan(usize, 0, 2) == 0) {
+                        try self.branch(myCounters, x, y, .shootLeft, (life +| self.args.multiplier));
+                    }
+                    else {
+                        try self.branch(myCounters, x, y, .shootRight, (life +| self.args.multiplier));
+                    }
                 }
             }
 
@@ -538,7 +517,6 @@ const App = struct {
             _ = &branch_type;
 
             const branch_str = try self.chooseString(branch_type, life, dx, dy);
-            // const branch_str = "/|";
 
             const x_pos = x;
             const y_pos = y;
@@ -550,7 +528,8 @@ const App = struct {
                 .height = .{ .limit = y_max },
             });
 
-            // grab wide character from branchStr
+            // TODO: Only print segments that don't overlap too harshly with
+            // other parts of the tree
             // if (x % branch_str.len == 0) {
             //     _ = try tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
             // }
@@ -564,9 +543,8 @@ const App = struct {
         }
     }
 
+    /// Determine which way the tree shoot draw towards
     fn setDeltas(self: *App, branch_type: branchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
-        // var dx: i64 = 0;
-        // var dy: i64 = 0;
         var dice: i64 = 0;
 
         switch (branch_type) {
@@ -692,11 +670,9 @@ const App = struct {
                 returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
             },
         }
-
-        // returnDx.* = dx;
-        // returnDy.* = dy;
     }
 
+    /// Return vaxis style for color of tree parts
     fn chooseColor(self: *App, branch_type: branchType) vaxis.Style {
         switch (branch_type) {
             .trunk, .shootLeft, .shootRight => {
@@ -738,6 +714,7 @@ const App = struct {
         }
     }
 
+    /// Return a String for the tree
     fn chooseString(self: *App, branch_type_input: branchType, life: usize, dx: i64, dy: i64) ![]const u8 {
         var branch_type = branch_type_input;
 
@@ -826,10 +803,12 @@ const App = struct {
         return branch_str;
     }
 
+    /// Get an i64 from 0 to (mod - 1)
     fn roll(self: *App, dice: *i64, mod: i64) void {
         dice.* = self.rand.random().intRangeLessThan(i64, 0, mod);
     }
 
+    /// Get Max Y bounds for the tree, based on baseType
     fn getTreeWinMaxY(self: *App) usize {
         const win = self.vx.window();
 
@@ -840,6 +819,7 @@ const App = struct {
         };
     }
 
+    /// Get Max X bounds for the tree, based on baseType
     fn getTreeWinMaxX(self: *App) usize {
         const win = self.vx.window();
 
@@ -849,6 +829,7 @@ const App = struct {
     }
 };
 
+/// Used to count tree properties
 const Counters = struct {
     branches: usize = 0,
     shoots: usize = 0,

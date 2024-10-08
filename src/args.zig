@@ -5,23 +5,21 @@ const builtin = @import("builtin");
 
 const BaseType = @import("base_type.zig").BaseType;
 const Verbosity = @import("verbosity.zig").Verbosity;
-const errors = @import("errors.zig");
 
 const io = std.io;
 
 pub const Args = struct {
     allocator: Allocator,
 
+    help: bool = false,
+
     live: bool = false,
     infinite: bool = false,
     screensaver: bool = false,
     printTree: bool = false,
-    /// TODO: Should be an enum with 3 levels
     verbosity: Verbosity,
     lifeStart: usize = 32,
     multiplier: usize = 5,
-    /// TODO: Should be an enum with 3 choices
-    /// none, small, large
     baseType: BaseType,
     seed: u64,
     leavesSize: usize = 0,
@@ -96,7 +94,7 @@ pub const Args = struct {
 
         if (res.args.help != 0) {
             try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
-            return errors.ControlledExit.Help;
+            // return errors.ControlledExit.Help;
         }
 
         var multiplier: usize = 5;
@@ -147,6 +145,7 @@ pub const Args = struct {
 
         return Args{
             .allocator = ally,
+            .help = res.args.help != 0,
             .live = res.args.live != 0,
             .infinite = res.args.infinite != 0,
             .screensaver = res.args.screensaver != 0,

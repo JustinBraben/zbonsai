@@ -4,7 +4,7 @@
 
 ![zbonsai_capture.png](https://github.com/JustinBraben/zbonsai/blob/main/zbonsai_capture.PNG)
 
-zbonsai is a Zig-based terminal application that procedurally generates beautiful bonsai trees in your command line interface. Inspired by [cbonsai](https://gitlab.com/jallbrit/cbonsai), zbonsai brings the zen of bonsai to your terminal, reimagined in the Zig programming language.
+Inspired by [cbonsai](https://gitlab.com/jallbrit/cbonsai), zbonsai is a Zig-based terminal application that procedurally generates beautiful bonsai trees in your command line interface. zbonsai brings the zen of bonsai to your terminal, reimagined in the Zig programming language.
 
 ## Features
 
@@ -79,10 +79,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## TODO
 
+- [x] Generating Bonsai
+- [x] Three different plant bases
+- [x] Instantly view generated tree
+- [x] Live view of tree generating by optionally passing `-l`
 - [ ] Implement message box
-- [ ] Add benchmarking
+- [ ] Implement print to terminal on completion `-p`
+- [ ] Implement file saving and loading
+- [ ] Add option to use different Random Number Generators
+- [ ] Add benchmarking/testing
+- [ ] Improve resizing 
 - [ ] Improve documentation
 
 ---
 
-*Note: This project is a work in progress and is primarily for learning purposes. Use in production environments is not recommended at this stage.*
+*Note: This project is a work in progress and is primarily for learning purposes.*
