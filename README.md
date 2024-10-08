@@ -83,7 +83,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Three different plant bases
 - [x] Instantly view generated tree
 - [x] Live view of tree generating by optionally passing `-l`
-- [ ] Implement message box
+- [X] Implement message box
 - [ ] Implement print to terminal on completion `-p`
 - [ ] Implement file saving and loading
 - [ ] Add option to use different Random Number Generators

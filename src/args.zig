@@ -102,8 +102,9 @@ pub const Args = struct {
             multiplier = m;
 
         var message: ?[]const u8 = null;
-        if (res.args.message) |msg|
-            message = msg;
+        if (res.args.message) |msg|{
+            message = try std.fmt.allocPrint(ally, "{s}", .{msg});
+        }
 
         var baseType: BaseType = .large;
         if (res.args.base) |bs|
@@ -173,6 +174,9 @@ pub const Args = struct {
     }
 
     pub fn deinit(self: *Args) void {
+        if (self.message) |msg| {
+            self.allocator.free(msg);
+        }
         self.allocator.free(self.saveFile);
         self.allocator.free(self.loadFile);
     }

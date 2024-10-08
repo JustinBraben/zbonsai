@@ -15,13 +15,6 @@ const clap = @import("clap");
 
 const branchType = enum { trunk, shootLeft, shootRight, dying, dead };
 
-const vaxisObjects = struct {
-    baseWin: ?*vaxis.Window = null,
-    treeWin: ?*vaxis.Window = null,
-    messageBorderWin: ?*vaxis.Window = null,
-    messageWin: ?*vaxis.Window = null,
-};
-
 /// Set the default panic handler to the vaxis panic_handler. This will clean up the terminal if any
 /// panics occur
 pub const panic = vaxis.panic_handler;
@@ -38,16 +31,13 @@ pub const std_options: std.Options = .{
 const Event = union(enum) {
     key_press: vaxis.Key,
     key_release: vaxis.Key,
-    mouse: vaxis.Mouse,
-    focus_in, // window has gained focus
-    focus_out, // window has lost focus
-    paste_start, // bracketed paste start
-    paste_end, // bracketed paste end
-    paste: []const u8, // osc 52 paste, caller must free
-    color_report: vaxis.Color.Report, // osc 4, 10, 11, 12 response
-    color_scheme: vaxis.Color.Scheme, // light / dark OS theme changes
-    winsize: vaxis.Winsize, // the window size has changed. This event is always sent when the loop
-    // is started
+    /// osc 4, 10, 11, 12 response
+    color_report: vaxis.Color.Report,
+    /// light / dark OS theme changes
+    color_scheme: vaxis.Color.Scheme,
+    /// Signals window size has changed. 
+    /// This event is always sent when the loop is started
+    winsize: vaxis.Winsize, 
 };
 
 pub fn main() !void {
@@ -89,16 +79,12 @@ pub fn main() !void {
 const App = struct {
     allocator: Allocator,
     arena: std.heap.ArenaAllocator,
-    // A flag to show config
-    show_config: bool,
-    // A flag for if we should quit
+    /// A flag for if we should quit
     should_quit: bool,
     /// The tty we are talking to
     tty: vaxis.Tty,
     /// The vaxis instance
     vx: vaxis.Vaxis,
-    /// A mouse event that we will handle in the draw cycle
-    mouse: ?vaxis.Mouse,
     /// Random number generator
     rand: std.rand.Xoshiro256,
     /// Arguments passed in from command line
@@ -108,11 +94,9 @@ const App = struct {
         return .{
             .allocator = allocator,
             .arena = std.heap.ArenaAllocator.init(allocator),
-            .show_config = false,
             .should_quit = false,
             .tty = try vaxis.Tty.init(),
             .vx = try vaxis.init(allocator, .{}),
-            .mouse = null,
             .rand = std.rand.DefaultPrng.init(args.seed),
             .args = args,
         };
@@ -153,9 +137,6 @@ const App = struct {
         // fast, however it could be slow on ssh connections.
         try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
 
-        // Enable mouse events
-        try self.vx.setMouseMode(self.tty.anyWriter(), true);
-
         var myCounters = std.mem.zeroes(Counters);
 
         var pass_finished = false;
@@ -179,6 +160,7 @@ const App = struct {
                 const win = self.vx.window();
                 win.clear();
                 try self.drawWins();
+                try self.drawMessage();
                 try self.growTree(&myCounters);
                 pass_finished = true;
             }
@@ -203,7 +185,6 @@ const App = struct {
                     self.should_quit = true;
                 }
             },
-            .mouse => |mouse| self.mouse = mouse,
             .winsize => |ws| {
                 try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
             },
@@ -223,20 +204,7 @@ const App = struct {
         std.time.sleep(ms * std.time.ns_per_ms);
     }
 
-    /// Draw our current state
-    pub fn draw(self: *App) !void {
-        const win = self.vx.window();
-        if (win.width == 0) {
-            return;
-        }
-
-        win.clear();
-
-        self.vx.setMouseShape(.default);
-
-        try self.drawWins();
-    }
-
+    /// For debugging, used to view args values in the terminal window
     pub fn drawConfig(self: *App) !void {
         const win = self.vx.window();
         const msg = try std.fmt.allocPrint(self.arena.allocator(),
@@ -356,6 +324,50 @@ const App = struct {
         }
     }
 
+    fn drawMessage(self: *App) !void {
+        if (self.args.message) |msg| {
+            const win = self.vx.window();
+
+            // Get the 3/4 pos of X for the window
+            const mid_x = (win.width / 2) +| (win.width / 4);
+
+            // Bound size_x to 34 at most
+            const child_size_x: usize = if (msg.len > 30) 34 else msg.len + 5;
+            // Message box at least size_y of 3
+            // Each 30 characters will add another line characters 
+            const child_size_y: usize = @divFloor(msg.len, 30) + 3;
+
+            const x_pos = mid_x -| (child_size_x / 4);
+            const y_pos = (win.height / 2);
+
+            const custom_border: [6][]const u8 = .{ "+", "-", "+", "│", "+", "+" };
+            const message_child = win.child(.{
+                .x_off = x_pos,
+                .y_off = y_pos,
+                .width = .{ .limit = child_size_x },
+                .height = .{ .limit = child_size_y },
+                .border = .{ .where = .all, .glyphs = .{ .custom = custom_border }},
+            });
+
+            var index: usize = 0;
+            while (index < msg.len) : (index += 30) {
+                const end = index + 30;
+                if (end < msg.len) {
+                    _ = try message_child.printSegment(
+                        .{ .text = msg[index..end]}, 
+                        .{ .col_offset = 1, .row_offset = @divFloor(index, 30)}
+                    );
+                }
+                else {
+                    _ = try message_child.printSegment(
+                        .{ .text = msg[index..]}, 
+                        .{ .col_offset = 1, .row_offset = @divFloor(index, 30)}
+                    );
+                }
+            }
+        }
+    }
+
     /// Used to debug initial tree drawing placement
     fn drawTree(self: *App) !void {
         const win = self.vx.window();
@@ -418,14 +430,16 @@ const App = struct {
 
         // recursively grow tree trunk and branches
         try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
+
+        const win = self.vx.window();
+        win.hideCursor();
     }
 
     /// Recursively draws the parts of the tree
-    fn branch(self: *App, myCounters: *Counters, x_input: usize, y_input: usize, branch_type_input: branchType, life_input: usize) !void {
+    fn branch(self: *App, myCounters: *Counters, x_input: usize, y_input: usize, branch_type: branchType, life_input: usize) !void {
         var x = x_input;
         var y = y_input;
         var life = life_input;
-        var branch_type = branch_type_input;
 
         myCounters.*.branches +|= 1;
         var dx: i64 = 0;
@@ -514,7 +528,6 @@ const App = struct {
 
             // Choose color for this branch
             const style = self.chooseColor(branch_type);
-            _ = &branch_type;
 
             const branch_str = try self.chooseString(branch_type, life, dx, dy);
 
