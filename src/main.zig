@@ -121,7 +121,7 @@ const App = struct {
             .tty = try vaxis.Tty.init(),
             .vx = try vaxis.init(allocator, .{}),
             .mouse = null,
-            .rand = std.rand.DefaultPrng.init(0),
+            .rand = std.rand.DefaultPrng.init(args.seed),
             .args = args,
         };
     }
