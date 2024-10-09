@@ -77,6 +77,7 @@ pub const Args = struct {
             .INT = clap.parsers.int(i64, 10),
             .U64 = clap.parsers.int(u64, 10),
             .USIZE = clap.parsers.int(usize, 10),
+            .F32 = clap.parsers.float(f32),
             .TIME = clap.parsers.float(f32),
             .BASETYPE = clap.parsers.enumeration(BaseType),
             .VERBOSITY = clap.parsers.enumeration(Verbosity),
@@ -92,13 +93,26 @@ pub const Args = struct {
         };
         defer res.deinit();
 
+        // Return errors on args not yet implemented
+        if (res.args.infinite != 0 or
+            res.args.screensaver != 0 or
+            res.args.save != null or
+            res.args.load != null) {
+            return error.NotImplemented;
+        }
+
+        // Write help if -h was passed
         if (res.args.help != 0) {
             try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
         }
 
         var multiplier: usize = 5;
-        if (res.args.multiplier) |m|
+        if (res.args.multiplier) |m| {
+            if (m < 0 or m > 20) {
+                return error.MultiplierOutOfRange;
+            }
             multiplier = m;
+        }
 
         var message: ?[]const u8 = null;
         if (res.args.message) |msg|{

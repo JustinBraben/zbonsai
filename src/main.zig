@@ -12,6 +12,7 @@ const Args = @import("args.zig").Args;
 const Dice = @import("dice.zig").Dice;
 
 const vaxis = @import("vaxis");
+const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
 
 const branchType = enum { trunk, shootLeft, shootRight, dying, dead };
@@ -534,9 +535,12 @@ const App = struct {
 
             // TODO: Only print segments that don't overlap too harshly with
             // other parts of the tree
-            // if (x % branch_str.len == 0) {
+            // const branch_str_width = try gwidth(branch_str, .wcwidth, &self.vx.unicode.width_data);
+            // if (branch_str_width > 0 and x % branch_str_width == 0) {
             //     _ = try tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
             // }
+
+            // Draw branch regardless of string length
             _ = try tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
 
             // if live, update screen
