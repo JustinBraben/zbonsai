@@ -417,7 +417,7 @@ const App = struct {
 
         myCounters.*.shoots = 0;
         myCounters.*.branches = 0;
-        myCounters.*.shootCounter = self.rand.random().int(usize);
+        myCounters.*.shootCounter = @as(usize, self.rand.random().int(u31));
 
         // recursively grow tree trunk and branches
         try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
