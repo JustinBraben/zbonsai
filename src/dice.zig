@@ -1,43 +1,53 @@
 const std = @import("std");
 const testing = std.testing;
 
-pub const Dice = struct {
-    seed: u64 = 0, 
-    rand: std.rand.Xoshiro256,
+/// Object used to generate Random numbers for the main App
 
-    pub fn initWithGeneratedSeed() Dice {
-        return .{
-            .rand = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp()))),
-        };
-    }
+const Dice = @This();
 
-    pub fn initWithSeed(input_seed: u64) Dice {
-        return .{
-            .rand = std.rand.DefaultPrng.init(input_seed),
-        };
-    }
+seed: u64 = 0, 
+rand: std.rand.Xoshiro256,
 
-    pub fn roll(self: *Dice, less_than: i64) i64 {
-        return self.rand.random().intRangeLessThan(i64, 0, less_than);
-    }
-};
+pub fn initWithGeneratedSeed() Dice {
+    return .{
+        .rand = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp()))),
+    };
+}
 
-fn rollWithinBounds(actual: i64, lower: i64, upper: i64) bool {
+pub fn initWithSeed(input_seed: u64) Dice {
+    return .{
+        .rand = std.rand.DefaultPrng.init(input_seed),
+    };
+}
+
+/// Roll the dice for a usize
+pub fn rollUsize(self: *Dice, less_than: usize) usize {
+    return self.rand.random().intRangeLessThan(usize, 0, less_than);
+}
+
+/// Roll the dice for an i64
+pub fn rollI64(self: *Dice, less_than: i64) i64 {
+    return self.rand.random().intRangeLessThan(i64, 0, less_than);
+}
+
+
+/// Function for testing
+fn rollI64WithinBounds(actual: i64, lower: i64, upper: i64) bool {
     return (actual >= lower and actual < upper);
 }
 
 test "Dice rolls" {
     var dice = Dice.initWithGeneratedSeed();
 
-    const roll_1 = dice.roll(10);
-    const roll_2 = dice.roll(10);
-    const roll_3 = dice.roll(10);
-    const roll_4 = dice.roll(10);
-    const roll_5 = dice.roll(10);
+    const roll_1 = dice.rollI64(10);
+    const roll_2 = dice.rollI64(10);
+    const roll_3 = dice.rollI64(10);
+    const roll_4 = dice.rollI64(10);
+    const roll_5 = dice.rollI64(10);
 
-    try testing.expect(rollWithinBounds(roll_1, 0, 10));
-    try testing.expect(rollWithinBounds(roll_2, 0, 10));
-    try testing.expect(rollWithinBounds(roll_3, 0, 10));
-    try testing.expect(rollWithinBounds(roll_4, 0, 10));
-    try testing.expect(rollWithinBounds(roll_5, 0, 10));
+    try testing.expect(rollI64WithinBounds(roll_1, 0, 10));
+    try testing.expect(rollI64WithinBounds(roll_2, 0, 10));
+    try testing.expect(rollI64WithinBounds(roll_3, 0, 10));
+    try testing.expect(rollI64WithinBounds(roll_4, 0, 10));
+    try testing.expect(rollI64WithinBounds(roll_5, 0, 10));
 }

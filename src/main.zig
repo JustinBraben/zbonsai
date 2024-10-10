@@ -9,7 +9,7 @@ const builtin = std.builtin;
 const BaseType = @import("base_type.zig").BaseType;
 const Styles = @import("styles.zig");
 const Args = @import("args.zig").Args;
-const Dice = @import("dice.zig").Dice;
+const Dice = @import("dice.zig");
 
 const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
@@ -87,8 +87,8 @@ const App = struct {
     tty: vaxis.Tty,
     /// The vaxis instance
     vx: vaxis.Vaxis,
-    /// Random number generator
-    rand: std.rand.Xoshiro256,
+    /// Roll the dice for Random number generator
+    dice: Dice,
     /// Arguments passed in from command line
     args: Args,
 
@@ -99,7 +99,7 @@ const App = struct {
             .should_quit = false,
             .tty = try vaxis.Tty.init(),
             .vx = try vaxis.init(allocator, .{}),
-            .rand = std.rand.DefaultPrng.init(args.seed),
+            .dice = Dice.initWithSeed(args.seed),
             .args = args,
         };
     }
@@ -418,7 +418,7 @@ const App = struct {
 
         myCounters.*.shoots = 0;
         myCounters.*.branches = 0;
-        myCounters.*.shootCounter = @as(usize, self.rand.random().int(u31));
+        myCounters.*.shootCounter = self.dice.rollUsize(std.math.maxInt(u31));
 
         // recursively grow tree trunk and branches
         try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
@@ -461,12 +461,19 @@ const App = struct {
             // dying shoot should branch into a lot of leaves
             else if ((branch_type == .shootLeft or branch_type == .shootRight) and life < (self.args.multiplier +| 2)) {
                 try self.branch(myCounters, x, y, .dying, life);
-            } else if ((branch_type == .trunk and self.rand.random().intRangeLessThan(usize, 0, 3) == 0) or
+            } else if ((branch_type == .trunk and self.dice.rollUsize(3) == 0) or
                 (life % self.args.multiplier == 0))
             {
-                if (self.rand.random().intRangeLessThan(usize, 0, 8) == 0 and life > 7) {
+                if (self.dice.rollUsize(8) == 0 and life > 7) {
                     shootCooldown = self.args.multiplier * 2;
-                    try self.branch(myCounters, x, y, .trunk, life + (self.rand.random().intRangeLessThan(usize, 0, 5) -| 2));
+
+                    const life_offset = self.dice.rollI64(5) - 2;
+                    if (life_offset < 0) {
+                        try self.branch(myCounters, x, y, .trunk, life -| @as(usize, @abs(life_offset)));
+                    }
+                    else {
+                        try self.branch(myCounters, x, y, .trunk, life +| @as(usize, @intCast(life_offset)));
+                    }
                 } else if (shootCooldown == 0) {
                     shootCooldown = self.args.multiplier * 2;
 
@@ -474,7 +481,7 @@ const App = struct {
                     myCounters.*.shootCounter +|= 1;
 
                     // 50/50 branch shootLeft or shootRight
-                    if (self.rand.random().intRangeLessThan(usize, 0, 2) == 0) {
+                    if (self.dice.rollUsize(2) == 0) {
                         try self.branch(myCounters, x, y, .shootLeft, (life +| self.args.multiplier));
                     }
                     else {
@@ -561,7 +568,7 @@ const App = struct {
                 // new or dead trunk
                 if (age <= 2 or life < 4) {
                     returnDy.* = 0;
-                    returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
+                    returnDx.* = self.dice.rollI64(3) - 1;
                 }
                 // young trunk should grow wide
                 else if (age < (multiplier * 3)) {
@@ -570,7 +577,7 @@ const App = struct {
                     // every (multiplier * 0.5) steps, raise tree to next level
                     if (age % @as(usize, @intFromFloat(res)) == 0) returnDy.* = -1 else returnDy.* = 0;
 
-                    self.roll(&dice, 10);
+                    dice = self.dice.rollI64(10);
                     if (dice >= 0 and dice <= 0) {
                         returnDx.* = -2;
                     } else if (dice >= 1 and dice <= 3) {
@@ -585,18 +592,18 @@ const App = struct {
                 }
                 // middle-age trunk
                 else {
-                    self.roll(&dice, 10);
+                    dice = self.dice.rollI64(10);
                     if (dice > 2) {
                         returnDy.* = -1;
                     } else {
                         returnDy.* = 0;
                     }
-                    returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
+                    returnDx.* = self.dice.rollI64(3) - 1;
                 }
             },
             // trend left and a little vertical movement
             .shootLeft => {
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 1) {
                     returnDy.* = -1;
                 } else if (dice >= 2 and dice <= 7) {
@@ -605,7 +612,7 @@ const App = struct {
                     returnDy.* = 1;
                 }
 
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 1) {
                     returnDx.* = -2;
                 } else if (dice >= 2 and dice <= 5) {
@@ -618,7 +625,7 @@ const App = struct {
             },
             // trend right and a little vertical movement
             .shootRight => {
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 1) {
                     returnDy.* = -1;
                 } else if (dice >= 2 and dice <= 7) {
@@ -627,7 +634,7 @@ const App = struct {
                     returnDy.* = 1;
                 }
 
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 1) {
                     returnDx.* = 2;
                 } else if (dice >= 2 and dice <= 5) {
@@ -640,7 +647,7 @@ const App = struct {
             },
             // discourage vertical growth(?); trend left/right (-3,3)
             .dying => {
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 1) {
                     returnDy.* = -1;
                 } else if (dice >= 2 and dice <= 8) {
@@ -649,7 +656,7 @@ const App = struct {
                     returnDy.* = 1;
                 }
 
-                self.roll(&dice, 15);
+                dice = self.dice.rollI64(15);
                 if (dice >= 0 and dice <= 0) {
                     returnDx.* = -3;
                 } else if (dice >= 1 and dice <= 2) {
@@ -667,7 +674,7 @@ const App = struct {
                 }
             },
             .dead => {
-                self.roll(&dice, 10);
+                dice = self.dice.rollI64(10);
                 if (dice >= 0 and dice <= 2) {
                     returnDy.* = -1;
                 } else if (dice >= 3 and dice <= 6) {
@@ -675,7 +682,7 @@ const App = struct {
                 } else if (dice >= 7 and dice <= 9) {
                     returnDy.* = 1;
                 }
-                returnDx.* = self.rand.random().intRangeLessThan(i64, -1, 2);
+                returnDx.* = self.dice.rollI64(3) - 1;
             },
         }
     }
@@ -684,7 +691,7 @@ const App = struct {
     fn chooseColor(self: *App, branch_type: branchType) vaxis.Style {
         switch (branch_type) {
             .trunk, .shootLeft, .shootRight => {
-                if (self.rand.random().intRangeLessThan(usize, 0, 2) == 0) {
+                if (self.dice.rollI64(2) == 0) {
                     return vaxis.Style{
                         .fg = .{ .index = 11 },
                         .bold = true,
@@ -696,7 +703,7 @@ const App = struct {
                 }
             },
             .dying => {
-                if (self.rand.random().intRangeLessThan(usize, 0, 10) == 0) {
+                if (self.dice.rollI64(10) == 0) {
                     return vaxis.Style{
                         .fg = .{ .index = 2 },
                         .bold = true,
@@ -708,7 +715,7 @@ const App = struct {
                 }
             },
             .dead => {
-                if (self.rand.random().intRangeLessThan(usize, 0, 3) == 0) {
+                if (self.dice.rollI64(3) == 0) {
                     return vaxis.Style{
                         .fg = .{ .index = 10 },
                         .bold = true,
@@ -801,7 +808,7 @@ const App = struct {
                 }
             },
             .dying, .dead => {
-                const rand_index = self.rand.random().intRangeLessThan(usize, 0, max_str_len);
+                const rand_index = self.dice.rollUsize(max_str_len);
                 const str = self.args.leaves[0..rand_index];
                 branch_str = try self.arena.allocator().realloc(branch_str, str.len);
                 std.mem.copyForwards(u8, branch_str, str);
@@ -809,11 +816,6 @@ const App = struct {
         }
 
         return branch_str;
-    }
-
-    /// Get an i64 from 0 to (mod - 1)
-    fn roll(self: *App, dice: *i64, mod: i64) void {
-        dice.* = self.rand.random().intRangeLessThan(i64, 0, mod);
     }
 
     /// Get Max Y bounds for the tree, based on baseType
