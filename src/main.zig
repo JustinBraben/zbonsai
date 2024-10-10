@@ -10,6 +10,7 @@ const BaseType = @import("base_type.zig").BaseType;
 const Styles = @import("styles.zig");
 const Args = @import("args.zig").Args;
 const Dice = @import("dice.zig");
+const Tree = @import("tree.zig");
 
 const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
@@ -91,6 +92,8 @@ const App = struct {
     dice: Dice,
     /// Arguments passed in from command line
     args: Args,
+    /// Tree to draw
+    tree: Tree,
 
     pub fn init(allocator: Allocator, args: Args) !App {
         return .{
@@ -101,12 +104,14 @@ const App = struct {
             .vx = try vaxis.init(allocator, .{}),
             .dice = Dice.initWithSeed(args.seed),
             .args = args,
+            .tree = Tree.init(allocator, .{}),
         };
     }
 
     pub fn deinit(self: *App) void {
         self.vx.deinit(self.allocator, self.tty.anyWriter());
         self.tty.deinit();
+        self.tree.deinit();
 
         // TODO: if printTree is set, print the final product of the tree
         // to the terminal window. Give back user access
