@@ -16,7 +16,7 @@ const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
 
-const branchType = enum { trunk, shootLeft, shootRight, dying, dead };
+const branchType = Tree.BranchType;
 
 /// Set the default panic handler to the vaxis panic_handler. This will clean up the terminal if any
 /// panics occur
@@ -76,7 +76,7 @@ pub fn main() !void {
     defer app.deinit();
 
     // Run the application
-    try app.run();
+    try app.new_run();
 }
 
 const App = struct {
@@ -116,6 +116,84 @@ const App = struct {
         // TODO: if printTree is set, print the final product of the tree
         // to the terminal window. Give back user access
         // if (!self.args.printTree) {}
+    }
+
+    pub fn new_run(self: *App) !void {
+        var loop: vaxis.Loop(Event) = .{
+            .tty = &self.tty,
+            .vaxis = &self.vx,
+        };
+        try loop.init();
+
+        // Start the event loop. Events will now be queued
+        try loop.start();
+
+        try self.vx.enterAltScreen(self.tty.anyWriter());
+
+        // Query the terminal to detect advanced features, such as kitty keyboard protocol, etc.
+        // This will automatically enable the features in the screen you are in, so you will want to
+        // call it after entering the alt screen if you are a full screen application. The second
+        // arg is a timeout for the terminal to send responses. Typically the response will be very
+        // fast, however it could be slow on ssh connections.
+        try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
+
+        // Main event loop
+        while (!self.should_quit) {
+            // pollEvent blocks until we have an event
+            loop.pollEvent();
+            // tryEvent returns events until the queue is empty
+            while (loop.tryEvent()) |event| {
+                try self.update(event);
+            }
+
+            const win = self.vx.window();
+            win.clear();
+            try self.drawWins();
+            try self.drawMessage();
+
+            try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
+
+            for (self.tree.branches_live.items) |item| {
+                const style = self.chooseColor(item.branch_type);
+                const branch_str = "/~";
+
+                _ = try win.printSegment(.{ .text = branch_str, .style = style }, .{
+                    .col_offset = item.x,
+                    .row_offset = item.y,
+                });
+
+                if (self.args.verbosity != .none) {
+                    const msg = try std.fmt.allocPrint(self.arena.allocator(),
+                        \\x: {d}
+                        \\y: {d}
+                        \\type: {s}
+                    , .{ item.x, item.y, @tagName(item.branch_type) });
+                    const verbose_child = win.child(.{
+                        .x_off = 5,
+                        .y_off = 2,
+                        .width = .{ .limit = 30 },
+                        .height = .{ .limit = 4 },
+                    });
+                    verbose_child.clear();
+
+                    _ = try verbose_child.printSegment(.{ .text = msg }, .{});
+                }
+            }
+
+            // If drawing live, add sleep to show
+            // live drawing
+            if (self.args.live) {
+                const ms: u64 = @intFromFloat(self.args.timeStep * std.time.ms_per_s);
+                std.time.sleep(ms * std.time.ns_per_ms);
+            }
+
+            // It's best to use a buffered writer for the render method. TTY provides one, but you
+            // may use your own. The provided bufferedWriter has a buffer size of 4096
+            var buffered = self.tty.bufferedWriter();
+            // Render the application to the screen
+            try self.vx.render(buffered.writer().any());
+            try buffered.flush();
+        }
     }
 
     pub fn run(self: *App) !void {
