@@ -76,7 +76,7 @@ pub fn main() !void {
     defer app.deinit();
 
     // Run the application
-    try app.new_run();
+    try app.run();
 }
 
 const App = struct {
