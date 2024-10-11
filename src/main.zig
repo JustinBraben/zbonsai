@@ -15,6 +15,7 @@ const Tree = @import("tree.zig");
 const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
+const ztracy = @import("ztracy");
 
 const branchType = Tree.BranchType;
 
@@ -47,8 +48,10 @@ const Event = union(enum) {
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
 
+    const tracy_args_init = ztracy.ZoneNC(@src(), "Args.init", 0x00_ff_00_00);
     var args = try Args.parse_args(allocator);
     defer args.deinit();
+    tracy_args_init.End();
 
     // If -h was passed help will be displayed
     // program will exit gracefully
@@ -72,12 +75,16 @@ pub fn main() !void {
         args.seed = @as(u64, @intCast(std.time.timestamp()));
     }
 
+    const tracy_app_init = ztracy.ZoneNC(@src(), "App.init", 0x00_ff_00_00);
     // Initialize our application
     var app = try App.init(allocator, args);
     defer app.deinit();
+    tracy_app_init.End();
 
     // Run the application
+    const tracy_app_run = ztracy.ZoneNC(@src(), "App.run", 0x00_ff_00_00);
     try app.run();
+    tracy_app_run.End();
 }
 
 const App = struct {
@@ -239,7 +246,9 @@ const App = struct {
                 win.clear();
                 try self.drawWins();
                 try self.drawMessage();
+                const tracy_grow_tree = ztracy.ZoneNC(@src(), "self.growTree(&myCounters)", 0x00_00_00_ff);
                 try self.growTree(&myCounters);
+                tracy_grow_tree.End();
                 pass_finished = true;
             }
 

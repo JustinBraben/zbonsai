@@ -7,6 +7,24 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const options = .{
+        .enable_ztracy = b.option(
+            bool,
+            "enable_ztracy",
+            "Enable Tracy profile markers",
+        ) orelse false,
+        .enable_fibers = b.option(
+            bool,
+            "enable_fibers",
+            "Enable Tracy fiber support",
+        ) orelse false,
+        .on_demand = b.option(
+            bool,
+            "on_demand",
+            "Build tracy with TRACY_ON_DEMAND",
+        ) orelse false,
+    };
+
     const clap = b.dependency("clap", .{
         .target = target,
         .optimize = optimize,
@@ -15,6 +33,12 @@ pub fn build(b: *std.Build) void {
     const vaxis = b.dependency("vaxis", .{
         .target = target,
         .optimize = optimize,
+    });
+
+    const ztracy = b.dependency("ztracy", .{
+        .enable_ztracy = options.enable_ztracy,
+        .enable_fibers = options.enable_fibers,
+        .on_demand = options.on_demand,
     });
 
     const exe = b.addExecutable(.{
@@ -28,6 +52,8 @@ pub fn build(b: *std.Build) void {
     exe.linkLibC();
     exe.root_module.addImport("clap", clap.module("clap"));
     exe.root_module.addImport("vaxis", vaxis.module("vaxis"));
+    exe.root_module.addImport("ztracy", ztracy.module("root"));
+    exe.linkLibrary(ztracy.artifact("tracy"));
 
     b.installArtifact(exe);
 
