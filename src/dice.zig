@@ -30,6 +30,11 @@ pub fn rollI64(self: *Dice, less_than: i64) i64 {
     return self.rand.random().intRangeLessThan(i64, 0, less_than);
 }
 
+/// Roll the fice for an f32
+pub fn rollF32(self: *Dice) f32 {
+    return self.rand.random().float(f32);
+}
+
 
 /// Function for testing
 fn rollI64WithinBounds(actual: i64, lower: i64, upper: i64) bool {

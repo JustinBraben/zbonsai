@@ -105,7 +105,10 @@ const App = struct {
             .vx = try vaxis.init(allocator, .{}),
             .dice = Dice.initWithSeed(args.seed),
             .args = args,
-            .tree = Tree.init(allocator, .{}),
+            .tree = Tree.init(allocator, .{
+                .life_start = args.lifeStart,
+                .multiplier = args.multiplier,
+            }),
         };
     }
 
@@ -152,13 +155,16 @@ const App = struct {
             try self.drawWins();
             try self.drawMessage();
 
-            // loop.postEvent(.{ .grow_tree = true});
+            if (self.tree.first_grow) {
+                loop.postEvent(.{ .grow_tree = true});
+            }
+            else if (!self.tree.treeComplete()) {
+                loop.postEvent(.{ .grow_tree = true});
+            }
 
-            try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
-
-            for (self.tree.branches_live.items) |item| {
+            for (self.tree.branches.items) |item| {
                 const style = self.chooseColor(item.branch_type);
-                const branch_str = "/~";
+                const branch_str = "/";
 
                 _ = try win.printSegment(.{ .text = branch_str, .style = style }, .{
                     .col_offset = item.x,
@@ -170,16 +176,18 @@ const App = struct {
                         \\x: {d}
                         \\y: {d}
                         \\type: {s}
-                    , .{ item.x, item.y, @tagName(item.branch_type) });
+                        \\shootLeftCounter: {d}
+                        \\shootRightCounter: {d}
+                    , .{ item.x, item.y, @tagName(item.branch_type), self.tree.shootLeftCounter(), self.tree.shootRightCounter() });
                     const verbose_child = win.child(.{
                         .x_off = 5,
                         .y_off = 2,
                         .width = .{ .limit = 30 },
-                        .height = .{ .limit = 4 },
+                        .height = .{ .limit = 6 },
                     });
                     verbose_child.clear();
 
-                    _ = try verbose_child.printSegment(.{ .text = msg }, .{});
+                    _ = try verbose_child.printSegment(.{ .text = msg, .style = style }, .{});
                 }
             }
 
@@ -275,6 +283,7 @@ const App = struct {
             .grow_tree => |gt| {
                 _ = gt;
                 try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
+                self.tree.updateLife();
             },
             else => {},
         }

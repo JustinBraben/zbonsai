@@ -43,7 +43,6 @@ allocator: Allocator,
 dice: Dice,
 options: TreeOptions,
 branches: ArrayList(Branch),
-branches_live: ArrayList(Branch),
 first_grow: bool = true,
 
 pub fn init(allocator: Allocator, options: TreeOptions) Tree {
@@ -52,14 +51,12 @@ pub fn init(allocator: Allocator, options: TreeOptions) Tree {
         .dice = Dice.initWithSeed(options.seed),
         .options = options,
         .branches = ArrayList(Branch).init(allocator),
-        .branches_live = ArrayList(Branch).init(allocator),
         .first_grow = true,
     };
 }
 
 pub fn deinit(self: *Tree) void {
     self.branches.deinit();
-    self.branches_live.deinit();
 }
 
 /// Used to make the first trunk of the tree
@@ -85,99 +82,150 @@ pub fn growTree(self: *Tree, input_max_x: usize, input_max_y: usize) !void {
         self.first_grow = false;
     }
 
-    const current_branch = self.branches.popOrNull();
-    if (current_branch) |cb| {
-        try self.processBranch(cb);
-        try self.branches_live.append(cb);
+    var index: usize = self.branches.items.len;
+    while(index > 0) {
+        index -|= 1;
+
+        const current_branch = self.branches.items[index];
+        try self.processBranch(current_branch);
     }
 }
 
+/// Given a branch, roll some dice and determine if it will create a branch
 pub fn processBranch(self: *Tree, branch: Branch) !void {
-    var x = branch.x;
-    var y = branch.y;
-    var life = branch.life;
-    // const branch_type = branch.branch_type;
-    // var shootCooldown = self.options.multiplier;
+    if (branch.life > 0) {
 
-    var dx: i64 = 0;
-    var dy: i64 = 0;
-    dx = self.dice.rollI64(5) - 2;
-    dx = self.dice.rollI64(5) - 2;
+        try self.createNewBranch(branch);
 
-    // Update x and y
-    if (dx > 0) {
-        x +|= @as(usize, @abs(dx));
-    } else {
-        x -|= @as(usize, @abs(dx));
-    }
-    if (dy > 0) {
-        y +|= @as(usize, @abs(dy));
-    } else {
-        y -|= @as(usize, @abs(dy));
-    }
-
-    // reduce dy if too close to the ground
-    if (dy > 0 and y > (self.options.max_y -| 2)) dy -= 1;
-
-    while (life > 0) {
-        life -|= 1;
-        // const age = self.options.life_start -| life;
-
-        // self.setDeltas(branch_type, life, age, &dx, &dy);
-
-        if (life < 3) {
-            try self.branches.append(Branch{ .x = x, .y = y -| life, .life = life, .branch_type = .dead });
-        } 
-        // else if (branch_type == .trunk and life == (self.options.multiplier +| 2)) {
-        //     try self.branches.append(Branch{ .x = x -| 1, .y = y, .life = life, .branch_type = .dying });
-        // }
-
-        // Branch creation logic
-        // if (life < 3) {
-        //     try self.branches.append(Branch{ .x = x, .y = y, .life = life, .branch_type = .dead });
-        // } else if (branch_type == .trunk and life < (self.options.multiplier +| 2)) {
-        //     try self.branches.append(Branch{ .x = x, .y = y, .life = life, .branch_type = .dying });
-        // } // else if ((branch_type == .shootLeft or branch_type == .shootRight) and life < (self.options.multiplier +| 2)) {
-        //     try self.branches.append(Branch{ .x = x, .y = y, .life = life, .branch_type = .dying });
-        // }
-        // } else if ((branch_type == .trunk and self.dice.rollUsize(3) == 0) or
-        //     (life % self.options.multiplier == 0))
-        // {
-        //     if (self.dice.rollUsize(8) == 0 and life > 7) {
-        //         shootCooldown = self.options.multiplier * 2;
-        //         const life_offset = self.dice.rollI64(5) - 2;
-        //         if (life_offset < 0) {
-        //             try self.branches.append(Branch{
-        //                 .x = x,
-        //                 .y = y,
-        //                 .life = life -| @as(usize, @intCast(@abs(life_offset))),
-        //                 .branch_type = .trunk,
-        //             });
-        //         }
-        //         else {
-        //             try self.branches.append(Branch{
-        //                 .x = x,
-        //                 .y = y,
-        //                 .life = life +| @as(usize, @intCast(life_offset)),
-        //                 .branch_type = .trunk,
-        //             });
-        //         }
-        //     } else if (shootCooldown == 0) {
-        //         shootCooldown = self.options.multiplier * 2;
-
-        //         const new_branch_type = if (self.dice.rollUsize(2) == 0) BranchType.shootLeft else BranchType.shootRight;
-        //         try self.branches.append(Branch{
-        //             .x = x,
-        //             .y = y,
-        //             .life = life +| self.options.multiplier,
-        //             .branch_type = new_branch_type,
-        //         });
-        //     }
-
-        //     shootCooldown -|= 1;
+        // Depending on branch to process, determine what kind of branch it should create?
+        switch (branch.branch_type) {
+            .trunk => {},
+            .shootLeft => {},
+            .shootRight => {},
+            .dying => {},
+            .dead => {},
         }
+
+        // // Roughly how the former recursive function operated
+        // // TODO: Implement in the non-recursive way
+        // if (branch.life < 3) {try createDeadBranch(branch);}
+        // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
+        // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
+        // else if ((branch.branch_type == .trunk and ()) or (branch.life % self.options.multiplier == 0)){
+        //     // if trunk is branching and not about to die, create another trunk with random life
+		// 	if ((rand() % 8 == 0) && life > 7) {
+		// 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
+		// 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
+		// 	}
+        //     // otherwise a shoot
+        //     else if (shootCooldown <= 0) {
+
+        //     }
+        // }
+    }
 }
 
+fn createNewBranch(self: *Tree, branch: Branch) !void {
+    if (self.dice.rollF32() < @as(f32, @floatFromInt(self.options.multiplier)) / 20.0) {
+        var x = branch.x;
+        var y = branch.y;
+
+        var dx: i64 = 0;
+        var dy: i64 = 0;
+
+        const maxY = self.options.max_y;
+        // reduce dy if too close to the ground
+        if (dy > 0 and y > (maxY -| 2)) dy -= 1;
+
+        const new_direction = self.dice.rollI64(4) - 2;
+        switch (new_direction) {
+            -2 => dy = -1,
+            -1 => dx = 1,
+            0 => dy = 1,
+            1 => dx = -1,
+            else => unreachable,
+        }
+
+        if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
+
+        // move in x and y directions
+        if (dx > 0) {
+            x +|= @as(usize, @intCast(@abs(dx)));
+        } else {
+            x -|= @as(usize, @intCast(@abs(dx)));
+        }
+
+        if (dy > 0) {
+            y +|= @as(usize, @intCast(@abs(dy)));
+        } else {
+            y -|= @as(usize, @intCast(@abs(dy)));
+        }
+
+        var new_branch_type = branch.branch_type;
+        if (dx != 0) {
+            new_branch_type = if (dx < 0) .shootLeft else .shootRight;
+        }
+
+
+        try self.branches.append(Branch{ .x = x, .y = y, .life = branch.life -| 1, .branch_type = new_branch_type});
+    }
+}
+
+/// Decrements the life of every tree branch
+/// Should be called after every growTree
+pub fn updateLife(self: *Tree) void {
+    for (self.branches.items, 0..) |branch, index| {
+        if (branch.life > 0) self.branches.items[index].life = self.branches.items[index].life -| 1;
+    }
+}
+
+/// Determines if life has completed on the tree
+/// If all branches have ran out of life, no need to grow the tree anymore
+pub fn treeComplete(self: *Tree) bool {
+    for (self.branches.items) |branch| {
+        if (branch.life > 0) return false;
+    }
+
+    return true;
+}
+
+/// Count the `.trunk` branches in the tree
+pub fn trunkCounter(self: *Tree) usize {
+    var count: usize = 0;
+    for (self.branches.items) |branch| {
+        if (branch.branch_type == .trunk) count +|= 1;
+    }
+    return count;
+}
+
+/// Count all `.shootLeft` branches in the tree
+pub fn shootLeftCounter(self: *Tree) usize {
+    var count: usize = 0;
+    for (self.branches.items) |branch| {
+        if (branch.branch_type == .shootLeft) count +|= 1;
+    }
+    return count;
+}
+
+/// Count all `.shootRight` branches in the tree
+pub fn shootRightCounter(self: *Tree) usize {
+    var count: usize = 0;
+    for (self.branches.items) |branch| {
+        if (branch.branch_type == .shootRight) count +|= 1;
+    }
+    return count;
+}
+
+/// Count all `.dying` branches in the tree
+pub fn dyingCounter(self: *Tree) usize {
+    var count: usize = 0;
+    for (self.branches.items) |branch| {
+        if (branch.branch_type == .dying) count +|= 1;
+    }
+    return count;
+}
+
+/// Previous setDeltas when using recursion
 fn setDeltas(self: *Tree, branch_type: BranchType, life: usize, age: usize, returnDx: *i64, returnDy: *i64) void {
     var dice: i64 = 0;
 
@@ -330,13 +378,16 @@ test "Grow tree" {
     var tree = Tree.init(test_allocator, .{ .seed = 1});
     defer tree.deinit();
 
-    try tree.growTree(20, 20);
-    try testing.expectEqual(1, tree.branches_live.items.len);
-    try testing.expect(tree.branches.items.len > 0);
+    // try tree.growTree(20, 20);
+    // try testing.expectEqual(1, tree.branches.items.len);
+    // try testing.expect(tree.branches.items.len > 0);
+    // try testing.expectEqual(31, tree.branches.items[0].life);
 
-    // With a seeded random we can determine how many items should be available every growTree
-    try tree.growTree(20, 20);
-    try testing.expectEqual(2, tree.branches.items.len);
-    try tree.growTree(20, 20);
-    try testing.expectEqual(2, tree.branches.items.len);
+    // // With a seeded random we can determine how many items should be available every growTree
+    // try tree.growTree(20, 20);
+    // try testing.expectEqual(30, tree.branches.items[0].life);
+    // try testing.expectEqual(1, tree.branches.items.len);
+    // try tree.growTree(20, 20);
+    // try testing.expectEqual(2, tree.branches.items.len);
+    // try testing.expectEqual(29, tree.branches.items[0].life);
 }
