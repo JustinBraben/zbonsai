@@ -84,54 +84,53 @@ pub fn growTree(self: *Tree, input_max_x: usize, input_max_y: usize) !void {
         try self.sproutTree(input_max_x, input_max_y);
         self.first_grow = false;
     }
-    else {
-        const current_branch = self.branches.popOrNull();
-        if (current_branch) |cb| {
-            try self.processBranch(cb);
-            try self.branches_live.append(cb);
-        }
-    }
 
-    // if (self.branches.items.len > 0) {
-    //     const current_branch = self.branches.pop();
-    //     try self.processBranch(current_branch);
-    //     try self.branches_live.append(current_branch);
-    // }
+    const current_branch = self.branches.popOrNull();
+    if (current_branch) |cb| {
+        try self.processBranch(cb);
+        try self.branches_live.append(cb);
+    }
 }
 
 pub fn processBranch(self: *Tree, branch: Branch) !void {
     var x = branch.x;
     var y = branch.y;
     var life = branch.life;
-    const branch_type = branch.branch_type;
+    // const branch_type = branch.branch_type;
     // var shootCooldown = self.options.multiplier;
+
+    var dx: i64 = 0;
+    var dy: i64 = 0;
+    dx = self.dice.rollI64(5) - 2;
+    dx = self.dice.rollI64(5) - 2;
+
+    // Update x and y
+    if (dx > 0) {
+        x +|= @as(usize, @abs(dx));
+    } else {
+        x -|= @as(usize, @abs(dx));
+    }
+    if (dy > 0) {
+        y +|= @as(usize, @abs(dy));
+    } else {
+        y -|= @as(usize, @abs(dy));
+    }
+
+    // reduce dy if too close to the ground
+    if (dy > 0 and y > (self.options.max_y -| 2)) dy -= 1;
 
     while (life > 0) {
         life -|= 1;
-        const age = self.options.life_start -| life;
+        // const age = self.options.life_start -| life;
 
-        var dx: i64 = 0;
-        var dy: i64 = 0;
-        self.setDeltas(branch_type, life, age, &dx, &dy);
-
-        // reduce dy if too close to the ground
-        if (dy > 0 and y > (self.options.max_y -| 2)) dy -= 1;
-
-        // Update x and y
-        if (dx > 0) {
-            x +|= @as(usize, @abs(dx));
-        } else {
-            x -|= @as(usize, @abs(dx));
-        }
-        if (dy > 0) {
-            y +|= @as(usize, @abs(dy));
-        } else {
-            y -|= @as(usize, @abs(dy));
-        }
+        // self.setDeltas(branch_type, life, age, &dx, &dy);
 
         if (life < 3) {
-            try self.branches.append(Branch{ .x = x, .y = y -| 1, .life = life, .branch_type = .dead });
-        }
+            try self.branches.append(Branch{ .x = x, .y = y -| life, .life = life, .branch_type = .dead });
+        } 
+        // else if (branch_type == .trunk and life == (self.options.multiplier +| 2)) {
+        //     try self.branches.append(Branch{ .x = x -| 1, .y = y, .life = life, .branch_type = .dying });
+        // }
 
         // Branch creation logic
         // if (life < 3) {
@@ -332,10 +331,12 @@ test "Grow tree" {
     defer tree.deinit();
 
     try tree.growTree(20, 20);
-    try testing.expectEqual(0, tree.branches_live.items.len);
+    try testing.expectEqual(1, tree.branches_live.items.len);
     try testing.expect(tree.branches.items.len > 0);
 
     // With a seeded random we can determine how many items should be available every growTree
     try tree.growTree(20, 20);
-    try testing.expectEqual(3, tree.branches.items.len);
+    try testing.expectEqual(2, tree.branches.items.len);
+    try tree.growTree(20, 20);
+    try testing.expectEqual(2, tree.branches.items.len);
 }

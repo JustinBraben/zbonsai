@@ -40,7 +40,8 @@ const Event = union(enum) {
     color_scheme: vaxis.Color.Scheme,
     /// Signals window size has changed. 
     /// This event is always sent when the loop is started
-    winsize: vaxis.Winsize, 
+    winsize: vaxis.Winsize,
+    grow_tree: bool,
 };
 
 pub fn main() !void {
@@ -150,6 +151,8 @@ const App = struct {
             win.clear();
             try self.drawWins();
             try self.drawMessage();
+
+            // loop.postEvent(.{ .grow_tree = true});
 
             try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
 
@@ -262,6 +265,16 @@ const App = struct {
             },
             .winsize => |ws| {
                 try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
+                const win = self.vx.window();
+                const center = vaxis.widgets.alignment.center(win, 50, 3);
+                _ = try center.printSegment(.{ .text = 
+                    \\Oops, resize needs to be implemented still...
+                    \\Press Ctrl+C to exit the program and run again
+                    }, .{});
+            },
+            .grow_tree => |gt| {
+                _ = gt;
+                try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
             },
             else => {},
         }
