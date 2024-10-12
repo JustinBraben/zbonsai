@@ -38,7 +38,7 @@ const Event = union(enum) {
     color_report: vaxis.Color.Report,
     /// light / dark OS theme changes
     color_scheme: vaxis.Color.Scheme,
-    /// Signals window size has changed. 
+    /// Signals window size has changed.
     /// This event is always sent when the loop is started
     winsize: vaxis.Winsize,
     grow_tree: bool,
@@ -156,17 +156,16 @@ const App = struct {
             try self.drawMessage();
 
             if (self.tree.first_grow) {
-                loop.postEvent(.{ .grow_tree = true});
-            }
-            else if (!self.tree.treeComplete()) {
-                loop.postEvent(.{ .grow_tree = true});
+                loop.postEvent(.{ .grow_tree = true });
+            } else if (!self.tree.treeComplete()) {
+                loop.postEvent(.{ .grow_tree = true });
             }
 
             for (self.tree.branches.items) |item| {
                 const style = self.chooseColor(item.branch_type);
                 const branch_str = "/";
 
-                _ = try win.printSegment(.{ .text = branch_str, .style = style }, .{
+                _ = try win.printSegment(.{ .text = branch_str, .style = item.style }, .{
                     .col_offset = item.x,
                     .row_offset = item.y,
                 });
@@ -276,9 +275,9 @@ const App = struct {
                 const win = self.vx.window();
                 const center = vaxis.widgets.alignment.center(win, 50, 3);
                 _ = try center.printSegment(.{ .text = 
-                    \\Oops, resize needs to be implemented still...
-                    \\Press Ctrl+C to exit the program and run again
-                    }, .{});
+                \\Oops, resize needs to be implemented still...
+                \\Press Ctrl+C to exit the program and run again
+                }, .{});
             },
             .grow_tree => |gt| {
                 _ = gt;
@@ -431,7 +430,7 @@ const App = struct {
             // Bound size_x to 34 at most
             const child_size_x: usize = if (msg.len > 30) 34 else msg.len + 5;
             // Message box at least size_y of 3
-            // Each 30 characters will add another line characters 
+            // Each 30 characters will add another line characters
             const child_size_y: usize = @divFloor(msg.len, 30) + 3;
 
             const x_pos = mid_x -| (child_size_x / 4);
@@ -443,23 +442,16 @@ const App = struct {
                 .y_off = y_pos,
                 .width = .{ .limit = child_size_x },
                 .height = .{ .limit = child_size_y },
-                .border = .{ .where = .all, .glyphs = .{ .custom = custom_border }},
+                .border = .{ .where = .all, .glyphs = .{ .custom = custom_border } },
             });
 
             var index: usize = 0;
             while (index < msg.len) : (index += 30) {
                 const end = index + 30;
                 if (end < msg.len) {
-                    _ = try message_child.printSegment(
-                        .{ .text = msg[index..end]}, 
-                        .{ .col_offset = 1, .row_offset = @divFloor(index, 30)}
-                    );
-                }
-                else {
-                    _ = try message_child.printSegment(
-                        .{ .text = msg[index..]}, 
-                        .{ .col_offset = 1, .row_offset = @divFloor(index, 30)}
-                    );
+                    _ = try message_child.printSegment(.{ .text = msg[index..end] }, .{ .col_offset = 1, .row_offset = @divFloor(index, 30) });
+                } else {
+                    _ = try message_child.printSegment(.{ .text = msg[index..] }, .{ .col_offset = 1, .row_offset = @divFloor(index, 30) });
                 }
             }
         }
@@ -575,8 +567,7 @@ const App = struct {
                     const life_offset = self.dice.rollI64(5) - 2;
                     if (life_offset < 0) {
                         try self.branch(myCounters, x, y, .trunk, life -| @as(usize, @abs(life_offset)));
-                    }
-                    else {
+                    } else {
                         try self.branch(myCounters, x, y, .trunk, life +| @as(usize, @intCast(life_offset)));
                     }
                 } else if (shootCooldown == 0) {
@@ -588,8 +579,7 @@ const App = struct {
                     // 50/50 branch shootLeft or shootRight
                     if (self.dice.rollUsize(2) == 0) {
                         try self.branch(myCounters, x, y, .shootLeft, (life +| self.args.multiplier));
-                    }
-                    else {
+                    } else {
                         try self.branch(myCounters, x, y, .shootRight, (life +| self.args.multiplier));
                     }
                 }

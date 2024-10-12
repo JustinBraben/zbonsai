@@ -4,6 +4,9 @@ const Allocator = mem.Allocator;
 const testing = std.testing;
 const ArrayList = std.ArrayList;
 
+const vaxis = @import("vaxis");
+const Style = vaxis.Style;
+
 const Dice = @import("dice.zig");
 
 pub const TreeError = error{
@@ -22,7 +25,8 @@ pub const Branch = struct {
     x: usize,
     y: usize,
     life: usize = 32,
-    branch_type: BranchType,
+    branch_type: BranchType = .trunk,
+    style: Style = .{},
 };
 
 /// Configurable options for the Tree
@@ -83,7 +87,7 @@ pub fn growTree(self: *Tree, input_max_x: usize, input_max_y: usize) !void {
     }
 
     var index: usize = self.branches.items.len;
-    while(index > 0) {
+    while (index > 0) {
         index -|= 1;
 
         const current_branch = self.branches.items[index];
@@ -94,8 +98,50 @@ pub fn growTree(self: *Tree, input_max_x: usize, input_max_y: usize) !void {
 /// Given a branch, roll some dice and determine if it will create a branch
 pub fn processBranch(self: *Tree, branch: Branch) !void {
     if (branch.life > 0) {
+        const growth_chance = @as(f32, @floatFromInt(self.options.multiplier)) / 20.0;
 
-        try self.createNewBranch(branch);
+        if (self.dice.rollF32() < growth_chance) {
+            try self.createNewBranch(branch);
+            // var new_branch = branch;
+            // new_branch.life -|= 1;
+
+            // const direction = self.dice.rollI64(4) - 2;
+            // switch (direction) {
+            //     -2 => {
+            //         new_branch.y = new_branch.y -| 1;
+            //         new_branch.branch_type = .shootLeft;
+            //     },
+            //     -1 => {
+            //         new_branch.x = new_branch.x +| 1;
+            //         new_branch.branch_type = .shootRight;
+            //     },
+            //     0 => {
+            //         new_branch.y = new_branch.y +| 1;
+            //     },
+            //     1 => {
+            //         new_branch.x = new_branch.x -| 1;
+            //         new_branch.branch_type = .shootLeft;
+            //     },
+            //     else => unreachable,
+            // }
+
+            // // Prevent growing out of bounds
+            // new_branch.x = std.math.clamp(new_branch.x, 0, self.options.max_x -| 1);
+            // new_branch.y = std.math.clamp(new_branch.y, 0, self.options.max_y -| 5);
+
+            // if (new_branch.life < 3) {
+            //     new_branch.branch_type = .dying;
+            // } else if (new_branch.life < (self.options.multiplier + 2)) {
+            //     if (new_branch.branch_type == .trunk or
+            //         new_branch.branch_type == .shootLeft or
+            //         new_branch.branch_type == .shootRight)
+            //     {
+            //         new_branch.branch_type = .dying;
+            //     }
+            // }
+
+            // try self.branches.append(new_branch);
+        }
 
         // Depending on branch to process, determine what kind of branch it should create?
         switch (branch.branch_type) {
@@ -113,10 +159,10 @@ pub fn processBranch(self: *Tree, branch: Branch) !void {
         // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
         // else if ((branch.branch_type == .trunk and ()) or (branch.life % self.options.multiplier == 0)){
         //     // if trunk is branching and not about to die, create another trunk with random life
-		// 	if ((rand() % 8 == 0) && life > 7) {
-		// 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
-		// 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
-		// 	}
+        // 	if ((rand() % 8 == 0) && life > 7) {
+        // 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
+        // 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
+        // 	}
         //     // otherwise a shoot
         //     else if (shootCooldown <= 0) {
 
@@ -126,49 +172,54 @@ pub fn processBranch(self: *Tree, branch: Branch) !void {
 }
 
 fn createNewBranch(self: *Tree, branch: Branch) !void {
-    if (self.dice.rollF32() < @as(f32, @floatFromInt(self.options.multiplier)) / 20.0) {
-        var x = branch.x;
-        var y = branch.y;
+    var x = branch.x;
+    var y = branch.y;
 
-        var dx: i64 = 0;
-        var dy: i64 = 0;
+    var dx: i64 = 0;
+    var dy: i64 = 0;
 
-        const maxY = self.options.max_y;
-        // reduce dy if too close to the ground
-        if (dy > 0 and y > (maxY -| 2)) dy -= 1;
+    // const maxY = self.options.max_y;
+    // reduce dy if too close to the ground
+    // if (dy > 0 and y > (maxY -| 2)) dy -= 1;
 
-        const new_direction = self.dice.rollI64(4) - 2;
-        switch (new_direction) {
-            -2 => dy = -1,
-            -1 => dx = 1,
-            0 => dy = 1,
-            1 => dx = -1,
-            else => unreachable,
-        }
-
-        if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
-
-        // move in x and y directions
-        if (dx > 0) {
-            x +|= @as(usize, @intCast(@abs(dx)));
-        } else {
-            x -|= @as(usize, @intCast(@abs(dx)));
-        }
-
-        if (dy > 0) {
-            y +|= @as(usize, @intCast(@abs(dy)));
-        } else {
-            y -|= @as(usize, @intCast(@abs(dy)));
-        }
-
-        var new_branch_type = branch.branch_type;
-        if (dx != 0) {
-            new_branch_type = if (dx < 0) .shootLeft else .shootRight;
-        }
-
-
-        try self.branches.append(Branch{ .x = x, .y = y, .life = branch.life -| 1, .branch_type = new_branch_type});
+    const new_direction = self.dice.rollI64(4) - 2;
+    switch (new_direction) {
+        -2 => dy = -1,
+        -1 => dx = 1,
+        0 => dy = 1,
+        1 => dx = -1,
+        else => unreachable,
     }
+
+    if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
+
+    // move in x and y directions
+    if (dx > 0) {
+        x +|= @as(usize, @intCast(@abs(dx)));
+    } else {
+        x -|= @as(usize, @intCast(@abs(dx)));
+    }
+
+    if (dy > 0) {
+        y +|= @as(usize, @intCast(@abs(dy)));
+    } else {
+        y -|= @as(usize, @intCast(@abs(dy)));
+    }
+
+    var new_branch_type = branch.branch_type;
+    if (dx != 0) {
+        new_branch_type = if (dx < 0) .shootLeft else .shootRight;
+    }
+
+    const new_branch = Branch{
+        .x = x,
+        .y = y,
+        .life = branch.life -| 1,
+        .branch_type = new_branch_type,
+        .style = self.chooseColor(new_branch_type),
+    };
+
+    try self.branches.append(new_branch);
 }
 
 /// Decrements the life of every tree branch
@@ -223,6 +274,48 @@ pub fn dyingCounter(self: *Tree) usize {
         if (branch.branch_type == .dying) count +|= 1;
     }
     return count;
+}
+
+/// Return vaxis style for color of tree parts
+fn chooseColor(self: *Tree, branch_type: BranchType) vaxis.Style {
+    switch (branch_type) {
+        .trunk, .shootLeft, .shootRight => {
+            if (self.dice.rollI64(2) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = 11 },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = 3 },
+                };
+            }
+        },
+        .dying => {
+            if (self.dice.rollI64(10) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = 2 },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = 2 },
+                };
+            }
+        },
+        .dead => {
+            if (self.dice.rollI64(3) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = 10 },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = 10 },
+                };
+            }
+        },
+    }
 }
 
 /// Previous setDeltas when using recursion
@@ -367,15 +460,13 @@ test "Sprout tree" {
     try testing.expectError(TreeError.SproutOnNonEmptyTree, tree.sproutTree(20, 20));
     try testing.expectError(TreeError.SproutOnNonEmptyTree, tree.growTree(20, 20));
 
-    if (tree.branches.items.len > 0) {
-        
-    }
+    if (tree.branches.items.len > 0) {}
 }
 
 test "Grow tree" {
     const test_allocator = testing.allocator;
 
-    var tree = Tree.init(test_allocator, .{ .seed = 1});
+    var tree = Tree.init(test_allocator, .{ .seed = 1 });
     defer tree.deinit();
 
     // try tree.growTree(20, 20);
