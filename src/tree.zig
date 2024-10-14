@@ -91,107 +91,62 @@ pub fn growTree(self: *Tree, input_max_x: usize, input_max_y: usize) !void {
         index -|= 1;
 
         const current_branch = self.branches.items[index];
-        try self.processBranch(current_branch);
+        if (current_branch.life > 0) {
+            try self.processBranch(current_branch);
+        }
     }
 }
 
 /// Given a branch, roll some dice and determine if it will create a branch
 pub fn processBranch(self: *Tree, branch: Branch) !void {
-    if (branch.life > 0) {
-        const growth_chance = @as(f32, @floatFromInt(self.options.multiplier)) / 20.0;
+    // How long the branch has been around
+    const age = self.options.life_start -| branch.life;
 
-        if (self.dice.rollF32() < growth_chance) {
-            try self.createNewBranch(branch);
-            // var new_branch = branch;
-            // new_branch.life -|= 1;
-
-            // const direction = self.dice.rollI64(4) - 2;
-            // switch (direction) {
-            //     -2 => {
-            //         new_branch.y = new_branch.y -| 1;
-            //         new_branch.branch_type = .shootLeft;
-            //     },
-            //     -1 => {
-            //         new_branch.x = new_branch.x +| 1;
-            //         new_branch.branch_type = .shootRight;
-            //     },
-            //     0 => {
-            //         new_branch.y = new_branch.y +| 1;
-            //     },
-            //     1 => {
-            //         new_branch.x = new_branch.x -| 1;
-            //         new_branch.branch_type = .shootLeft;
-            //     },
-            //     else => unreachable,
-            // }
-
-            // // Prevent growing out of bounds
-            // new_branch.x = std.math.clamp(new_branch.x, 0, self.options.max_x -| 1);
-            // new_branch.y = std.math.clamp(new_branch.y, 0, self.options.max_y -| 5);
-
-            // if (new_branch.life < 3) {
-            //     new_branch.branch_type = .dying;
-            // } else if (new_branch.life < (self.options.multiplier + 2)) {
-            //     if (new_branch.branch_type == .trunk or
-            //         new_branch.branch_type == .shootLeft or
-            //         new_branch.branch_type == .shootRight)
-            //     {
-            //         new_branch.branch_type = .dying;
-            //     }
-            // }
-
-            // try self.branches.append(new_branch);
-        }
-
-        // Depending on branch to process, determine what kind of branch it should create?
-        switch (branch.branch_type) {
-            .trunk => {},
-            .shootLeft => {},
-            .shootRight => {},
-            .dying => {},
-            .dead => {},
-        }
-
-        // // Roughly how the former recursive function operated
-        // // TODO: Implement in the non-recursive way
-        // if (branch.life < 3) {try createDeadBranch(branch);}
-        // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
-        // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
-        // else if ((branch.branch_type == .trunk and ()) or (branch.life % self.options.multiplier == 0)){
-        //     // if trunk is branching and not about to die, create another trunk with random life
-        // 	if ((rand() % 8 == 0) && life > 7) {
-        // 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
-        // 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
-        // 	}
-        //     // otherwise a shoot
-        //     else if (shootCooldown <= 0) {
-
-        //     }
-        // }
-    }
-}
-
-fn createNewBranch(self: *Tree, branch: Branch) !void {
-    var x = branch.x;
-    var y = branch.y;
+    // const growth_chance = @as(f32, @floatFromInt(self.options.multiplier)) / 20.0;
 
     var dx: i64 = 0;
     var dy: i64 = 0;
 
-    // const maxY = self.options.max_y;
-    // reduce dy if too close to the ground
-    // if (dy > 0 and y > (maxY -| 2)) dy -= 1;
-
-    const new_direction = self.dice.rollI64(4) - 2;
-    switch (new_direction) {
-        -2 => dy = -1,
-        -1 => dx = 1,
-        0 => dy = 1,
-        1 => dx = -1,
-        else => unreachable,
-    }
+    dx = self.setDeltaX(branch, age);
+    dy = self.setDeltaY(branch, age);
 
     if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
+
+    if (branch.life < 3) { try self.createNewBranch(branch, dx, dy, .dead); }
+    else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier +| 2)) {
+        try self.createNewBranch(branch, dx, dy, .dying);
+    }
+    else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and branch.life < (self.options.multiplier +| 2)) {
+        try self.createNewBranch(branch, dx, dy, .dying);
+    } else if ((branch.branch_type == .trunk and self.dice.rollUsize(3) == 0) or
+        (branch.life % self.options.multiplier == 0))
+    {
+
+    }
+}
+
+//         // // Roughly how the former recursive function operated
+//         // // TODO: Implement in the non-recursive way
+//         // if (branch.life < 3) {try createDeadBranch(branch);}
+//         // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
+//         // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
+//         // else if ((branch.branch_type == .trunk and ()) or (branch.life % self.options.multiplier == 0)){
+//         //     // if trunk is branching and not about to die, create another trunk with random life
+//         // 	if ((rand() % 8 == 0) && life > 7) {
+//         // 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
+//         // 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
+//         // 	}
+//         //     // otherwise a shoot
+//         //     else if (shootCooldown <= 0) {
+
+//         //     }
+//         // }
+//     }
+// }
+
+fn createNewBranch(self: *Tree, branch: Branch, dx: i64, dy: i64, new_branch_type: BranchType) !void {
+    var x = branch.x;
+    var y = branch.y;
 
     // move in x and y directions
     if (dx > 0) {
@@ -206,15 +161,10 @@ fn createNewBranch(self: *Tree, branch: Branch) !void {
         y -|= @as(usize, @intCast(@abs(dy)));
     }
 
-    var new_branch_type = branch.branch_type;
-    if (dx != 0) {
-        new_branch_type = if (dx < 0) .shootLeft else .shootRight;
-    }
-
     const new_branch = Branch{
         .x = x,
         .y = y,
-        .life = branch.life -| 1,
+        .life = branch.life,
         .branch_type = new_branch_type,
         .style = self.chooseColor(new_branch_type),
     };
@@ -318,131 +268,113 @@ fn chooseColor(self: *Tree, branch_type: BranchType) vaxis.Style {
     }
 }
 
-/// Previous setDeltas when using recursion
-fn setDeltas(self: *Tree, branch_type: BranchType, life: usize, age: usize, returnDx: *i64, returnDy: *i64) void {
-    var dice: i64 = 0;
-
-    switch (branch_type) {
+fn setDeltaX(self: *Tree, branch: Branch, age: usize) i64 {
+    switch (branch.branch_type) {
         .trunk => {
-
             // new or dead trunk
-            if (age <= 2 or life < 4) {
-                returnDy.* = 0;
-                returnDx.* = self.dice.rollI64(3) - 1;
+            if (age <= 2 or branch.life < 4) {
+                return self.dice.rollI64(3) - 1;
+            }
+            // young trunk should grow wide
+            else if (age < (self.options.multiplier * 3)) {
+
+                switch (self.dice.rollI64(10)) {
+                    0 => return -2,
+                    1,2,3 => return -1,
+                    4,5 => return 0,
+                    6,7,8 => return 1,
+                    9 => return 2,
+                    else => unreachable,
+                }
+            }
+            // middle-aged trunk
+            else {
+                return self.dice.rollI64(3) - 1;
+            }
+        },
+        .shootLeft => {
+            switch (self.dice.rollI64(10)) {
+                0,1 => return -2,
+                2,3,4,5 => return -1,
+                6,7,8 => return 0,
+                9 => return 1,
+                else => unreachable,
+            }
+        },
+        .shootRight => {
+            switch (self.dice.rollI64(10)) {
+                0,1 => return 2,
+                2,3,4,5 => return 1,
+                6,7,8 => return 0,
+                9 => return -1,
+                else => unreachable,
+            }
+        },
+        .dying => {
+            switch (self.dice.rollI64(15)) {
+                0 => return -3,
+                1,2 => return -2,
+                3,4,5 => return -1,
+                6,7,8 => return 0,
+                9,10,11 => return 1,
+                12,13 => return 2,
+                14 => return 3,
+                else => unreachable,
+            }
+        },
+        .dead => return self.dice.rollI64(3) - 1,
+    }
+}
+
+fn setDeltaY(self: *Tree, branch: Branch, age: usize) i64 {
+    switch (branch.branch_type) {
+        .trunk => {
+            // new or dead trunk
+            if (age <= 2 or branch.life < 4) {
+                return 0;
             }
             // young trunk should grow wide
             else if (age < (self.options.multiplier * 3)) {
                 const res = @as(f32, @floatFromInt(self.options.multiplier)) * 0.5;
-
                 // every (multiplier * 0.5) steps, raise tree to next level
-                if (age % @as(usize, @intFromFloat(res)) == 0) returnDy.* = -1 else returnDy.* = 0;
-
-                dice = self.dice.rollI64(10);
-                if (dice >= 0 and dice <= 0) {
-                    returnDx.* = -2;
-                } else if (dice >= 1 and dice <= 3) {
-                    returnDx.* = -1;
-                } else if (dice >= 4 and dice <= 5) {
-                    returnDx.* = 0;
-                } else if (dice >= 6 and dice <= 8) {
-                    returnDx.* = 1;
-                } else if (dice >= 9 and dice <= 9) {
-                    returnDx.* = 2;
-                }
+                if (age % @as(usize, @intFromFloat(res)) == 0) return -1 else return 0;
             }
-            // middle-age trunk
+            // middle-aged trunk
             else {
-                dice = self.dice.rollI64(10);
-                if (dice > 2) {
-                    returnDy.* = -1;
-                } else {
-                    returnDy.* = 0;
-                }
-                returnDx.* = self.dice.rollI64(3) - 1;
+                if (self.dice.rollI64(10) > 2) return -1 else return 0;
             }
         },
-        // trend left and a little vertical movement
         .shootLeft => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 7) {
-                returnDy.* = 0;
-            } else if (dice >= 8 and dice <= 9) {
-                returnDy.* = 1;
-            }
-
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDx.* = -2;
-            } else if (dice >= 2 and dice <= 5) {
-                returnDx.* = -1;
-            } else if (dice >= 6 and dice <= 8) {
-                returnDx.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDx.* = 1;
+            switch (self.dice.rollI64(10)) {
+                0,1 => return -1,
+                2,3,4,5,6,7  => return 0,
+                8,9 => return 1,
+                else => unreachable,
             }
         },
-        // trend right and a little vertical movement
         .shootRight => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 7) {
-                returnDy.* = 0;
-            } else if (dice >= 8 and dice <= 9) {
-                returnDy.* = 1;
-            }
-
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDx.* = 2;
-            } else if (dice >= 2 and dice <= 5) {
-                returnDx.* = 1;
-            } else if (dice >= 6 and dice <= 8) {
-                returnDx.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDx.* = -1;
+            switch (self.dice.rollI64(10)) {
+                0,1 => return -1,
+                2,3,4,5,6,7  => return 0,
+                8,9 => return 1,
+                else => unreachable,
             }
         },
-        // discourage vertical growth(?); trend left/right (-3,3)
         .dying => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 8) {
-                returnDy.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDy.* = 1;
-            }
-
-            dice = self.dice.rollI64(15);
-            if (dice >= 0 and dice <= 0) {
-                returnDx.* = -3;
-            } else if (dice >= 1 and dice <= 2) {
-                returnDx.* = -2;
-            } else if (dice >= 3 and dice <= 5) {
-                returnDx.* = 1;
-            } else if (dice >= 6 and dice <= 8) {
-                returnDx.* = 0;
-            } else if (dice >= 9 and dice <= 11) {
-                returnDx.* = 1;
-            } else if (dice >= 12 and dice <= 13) {
-                returnDx.* = 2;
-            } else if (dice >= 14 and dice <= 14) {
-                returnDx.* = 3;
+            switch (self.dice.rollI64(10)) {
+                0,1 => return -1,
+                2,3,4,5,6,7,8  => return 0,
+                9 => return 1,
+                else => unreachable,
             }
         },
         .dead => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 2) {
-                returnDy.* = -1;
-            } else if (dice >= 3 and dice <= 6) {
-                returnDy.* = 0;
-            } else if (dice >= 7 and dice <= 9) {
-                returnDy.* = 1;
+            switch (self.dice.rollI64(10)) {
+                0,1,2 => return -1,
+                3,4,5,6  => return 0,
+                7,8,9 => return 1,
+                else => unreachable,
             }
-            returnDx.* = self.dice.rollI64(3) - 1;
         },
     }
 }
