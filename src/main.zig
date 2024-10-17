@@ -144,7 +144,7 @@ const App = struct {
         // Main event loop
         while (!self.should_quit) {
             // pollEvent blocks until we have an event
-            loop.pollEvent();
+            // loop.pollEvent();
             // tryEvent returns events until the queue is empty
             while (loop.tryEvent()) |event| {
                 try self.update(event);
@@ -155,11 +155,8 @@ const App = struct {
             try self.drawWins();
             try self.drawMessage();
 
-            if (self.tree.first_grow) {
-                loop.postEvent(.{ .grow_tree = true });
-            } else if (!self.tree.treeComplete()) {
-                loop.postEvent(.{ .grow_tree = true });
-            }
+            try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
+            self.tree.updateLife();
 
             for (self.tree.branches.items) |item| {
                 const style = self.chooseColor(item.branch_type);

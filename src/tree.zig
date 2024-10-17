@@ -113,16 +113,16 @@ pub fn processBranch(self: *Tree, branch: Branch) !void {
     if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
 
     if (branch.life < 3) { try self.createNewBranch(branch, dx, dy, .dead); }
-    else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier +| 2)) {
-        try self.createNewBranch(branch, dx, dy, .dying);
-    }
-    else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and branch.life < (self.options.multiplier +| 2)) {
-        try self.createNewBranch(branch, dx, dy, .dying);
-    } else if ((branch.branch_type == .trunk and self.dice.rollUsize(3) == 0) or
-        (branch.life % self.options.multiplier == 0))
-    {
+    // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier +| 2)) {
+    //     try self.createNewBranch(branch, dx, dy, .dying);
+    // }
+    // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and branch.life < (self.options.multiplier +| 2)) {
+    //     try self.createNewBranch(branch, dx, dy, .dying);
+    // } else if ((branch.branch_type == .trunk and self.dice.rollUsize(3) == 0) or
+    //     (branch.life % self.options.multiplier == 0))
+    // {
 
-    }
+    // }
 }
 
 //         // // Roughly how the former recursive function operated
@@ -398,19 +398,39 @@ test "Sprout tree" {
 test "Grow tree" {
     const test_allocator = testing.allocator;
 
+    // With a seeded random we can determine how many items should be available every growTree
     var tree = Tree.init(test_allocator, .{ .seed = 1 });
     defer tree.deinit();
 
-    // try tree.growTree(20, 20);
+    try tree.growTree(20, 20);
+    tree.updateLife();
     // try testing.expectEqual(1, tree.branches.items.len);
     // try testing.expect(tree.branches.items.len > 0);
-    // try testing.expectEqual(31, tree.branches.items[0].life);
+    // try testing.expectEqual(32, tree.branches.items[0].life);
 
-    // // With a seeded random we can determine how many items should be available every growTree
+    var index: usize = 0;
+    while (!tree.treeComplete()) {
+        try tree.growTree(20, 20);
+        tree.updateLife();
+
+        switch (index) {
+            0...28 => try testing.expectEqual(1, tree.branches.items.len),
+            29 => try testing.expectEqual(2, tree.branches.items.len),
+            30 => try testing.expectEqual(4, tree.branches.items.len),
+            // 31...5000 => try testing.expectEqual(2, tree.branches.items.len),
+            // 32 => try testing.expectEqual(2, tree.branches.items.len),
+            // 33 => try testing.expectEqual(2, tree.branches.items.len),
+            else => unreachable,
+        }
+
+        index +|= 1;
+    }
+    
     // try tree.growTree(20, 20);
-    // try testing.expectEqual(30, tree.branches.items[0].life);
+    // tree.updateLife();
     // try testing.expectEqual(1, tree.branches.items.len);
+    // try testing.expect(tree.branches.items.len > 0);
+
     // try tree.growTree(20, 20);
-    // try testing.expectEqual(2, tree.branches.items.len);
-    // try testing.expectEqual(29, tree.branches.items[0].life);
+    // tree.updateLife();
 }

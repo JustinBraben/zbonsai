@@ -46,6 +46,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.linkLibC();
+    unit_tests.root_module.addImport("clap", clap.module("clap"));
+    unit_tests.root_module.addImport("vaxis", vaxis.module("vaxis"));
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
 }
