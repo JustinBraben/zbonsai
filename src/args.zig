@@ -97,7 +97,8 @@ pub const Args = struct {
         if (res.args.infinite != 0 or
             res.args.screensaver != 0 or
             res.args.save != null or
-            res.args.load != null) {
+            res.args.load != null)
+        {
             return error.NotImplemented;
         }
 
@@ -115,7 +116,7 @@ pub const Args = struct {
         }
 
         var message: ?[]const u8 = null;
-        if (res.args.message) |msg|{
+        if (res.args.message) |msg| {
             message = try std.fmt.allocPrint(ally, "{s}", .{msg});
         }
 

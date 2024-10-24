@@ -446,9 +446,7 @@ const App = struct {
             while (index < msg.len) : (index += 30) {
                 const end = index + 30;
                 if (end < msg.len) {
-                    _ = message_child.printSegment(.{ 
-                        .text = msg[index..end] }, 
-                        .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
+                    _ = message_child.printSegment(.{ .text = msg[index..end] }, .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
                 } else {
                     _ = message_child.printSegment(.{ .text = msg[index..] }, .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
                 }

@@ -2,10 +2,9 @@ const std = @import("std");
 const testing = std.testing;
 
 /// Object used to generate Random numbers for the main App
-
 const Dice = @This();
 
-seed: u64 = 0, 
+seed: u64 = 0,
 rand: std.rand.Xoshiro256,
 
 pub fn initWithGeneratedSeed() Dice {
@@ -34,7 +33,6 @@ pub fn rollI64(self: *Dice, less_than: i64) i64 {
 pub fn rollF32(self: *Dice) f32 {
     return self.rand.random().float(f32);
 }
-
 
 /// Function for testing
 fn rollI64WithinBounds(actual: i64, lower: i64, upper: i64) bool {

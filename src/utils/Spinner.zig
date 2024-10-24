@@ -5,7 +5,7 @@ const Cell = vaxis.Cell;
 
 const Spinner = @This();
 
-/// Windows doesn't have access to these by default, although 
+/// Windows doesn't have access to these by default, although
 /// can be supported with unicode
 const posix_characters = &[_][]const u8{
     "⠋",
@@ -43,11 +43,7 @@ pub fn draw(self: Spinner, win: vaxis.Window) void {
     // Only height of 1 windows are supported for now
     // if (win.height != 1 or win.width != 0) return;
 
-    win.writeCell(0, 0, 
-    .{ 
-        .char = self.character, 
-        .style = self.style 
-    });
+    win.writeCell(0, 0, .{ .char = self.character, .style = self.style });
 }
 
 /// Adds completed progress to the bar
@@ -57,6 +53,6 @@ pub fn update(self: *Spinner) void {
     self.character = .{ .grapheme = posix_characters[self.index], .width = 1 };
 }
 
-const sample = 
+const sample =
     \\⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏
-    ;
+;

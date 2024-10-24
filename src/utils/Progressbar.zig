@@ -32,8 +32,7 @@ pub fn draw(self: Progressbar, win: vaxis.Window) void {
     while (i < self.max_progress and i < win.width) : (i +|= 1) {
         if (i <= self.current_progress) {
             win.writeCell(i, 0, .{ .char = self.complete_character, .style = self.style });
-        }
-        else {
+        } else {
             win.writeCell(i, 0, .{ .char = self.incomplete_character, .style = self.style });
         }
     }
@@ -44,6 +43,6 @@ pub fn addProgress(self: *Progressbar, progress: usize) void {
     self.current_progress +|= progress;
 }
 
-const sample = 
+const sample =
     \\█░░░░░░░░░
-    ;
+;

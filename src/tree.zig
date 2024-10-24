@@ -112,7 +112,9 @@ pub fn processBranch(self: *Tree, branch: Branch) !void {
 
     if (dy > 0 and branch.y > (self.options.max_y -| 5)) dy -= 1;
 
-    if (branch.life < 3) { try self.createNewBranch(branch, dx, dy, .dead); }
+    if (branch.life < 3) {
+        try self.createNewBranch(branch, dx, dy, .dead);
+    }
     // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier +| 2)) {
     //     try self.createNewBranch(branch, dx, dy, .dying);
     // }
@@ -277,12 +279,11 @@ fn setDeltaX(self: *Tree, branch: Branch, age: usize) i64 {
             }
             // young trunk should grow wide
             else if (age < (self.options.multiplier * 3)) {
-
                 switch (self.dice.rollI64(10)) {
                     0 => return -2,
-                    1,2,3 => return -1,
-                    4,5 => return 0,
-                    6,7,8 => return 1,
+                    1, 2, 3 => return -1,
+                    4, 5 => return 0,
+                    6, 7, 8 => return 1,
                     9 => return 2,
                     else => unreachable,
                 }
@@ -294,18 +295,18 @@ fn setDeltaX(self: *Tree, branch: Branch, age: usize) i64 {
         },
         .shootLeft => {
             switch (self.dice.rollI64(10)) {
-                0,1 => return -2,
-                2,3,4,5 => return -1,
-                6,7,8 => return 0,
+                0, 1 => return -2,
+                2, 3, 4, 5 => return -1,
+                6, 7, 8 => return 0,
                 9 => return 1,
                 else => unreachable,
             }
         },
         .shootRight => {
             switch (self.dice.rollI64(10)) {
-                0,1 => return 2,
-                2,3,4,5 => return 1,
-                6,7,8 => return 0,
+                0, 1 => return 2,
+                2, 3, 4, 5 => return 1,
+                6, 7, 8 => return 0,
                 9 => return -1,
                 else => unreachable,
             }
@@ -313,11 +314,11 @@ fn setDeltaX(self: *Tree, branch: Branch, age: usize) i64 {
         .dying => {
             switch (self.dice.rollI64(15)) {
                 0 => return -3,
-                1,2 => return -2,
-                3,4,5 => return -1,
-                6,7,8 => return 0,
-                9,10,11 => return 1,
-                12,13 => return 2,
+                1, 2 => return -2,
+                3, 4, 5 => return -1,
+                6, 7, 8 => return 0,
+                9, 10, 11 => return 1,
+                12, 13 => return 2,
                 14 => return 3,
                 else => unreachable,
             }
@@ -346,33 +347,33 @@ fn setDeltaY(self: *Tree, branch: Branch, age: usize) i64 {
         },
         .shootLeft => {
             switch (self.dice.rollI64(10)) {
-                0,1 => return -1,
-                2,3,4,5,6,7  => return 0,
-                8,9 => return 1,
+                0, 1 => return -1,
+                2, 3, 4, 5, 6, 7 => return 0,
+                8, 9 => return 1,
                 else => unreachable,
             }
         },
         .shootRight => {
             switch (self.dice.rollI64(10)) {
-                0,1 => return -1,
-                2,3,4,5,6,7  => return 0,
-                8,9 => return 1,
+                0, 1 => return -1,
+                2, 3, 4, 5, 6, 7 => return 0,
+                8, 9 => return 1,
                 else => unreachable,
             }
         },
         .dying => {
             switch (self.dice.rollI64(10)) {
-                0,1 => return -1,
-                2,3,4,5,6,7,8  => return 0,
+                0, 1 => return -1,
+                2, 3, 4, 5, 6, 7, 8 => return 0,
                 9 => return 1,
                 else => unreachable,
             }
         },
         .dead => {
             switch (self.dice.rollI64(10)) {
-                0,1,2 => return -1,
-                3,4,5,6  => return 0,
-                7,8,9 => return 1,
+                0, 1, 2 => return -1,
+                3, 4, 5, 6 => return 0,
+                7, 8, 9 => return 1,
                 else => unreachable,
             }
         },
@@ -425,7 +426,7 @@ test "Grow tree" {
 
         index +|= 1;
     }
-    
+
     // try tree.growTree(20, 20);
     // tree.updateLife();
     // try testing.expectEqual(1, tree.branches.items.len);

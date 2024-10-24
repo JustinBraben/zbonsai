@@ -1,0 +1,55 @@
+name: CI
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  stable_build:
+    name: Stable Zig Compile and run Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-2022, macos-latest, ubuntu-latest ]
+
+    steps:
+        - uses: actions/checkout@v3
+        - uses: mlugg/setup-zig@v1
+          with:
+            version: 0.13.0
+        - name: Display Zig version
+          run: zig version
+        - name: Build and test
+          run: zig build test --summary all
+
+  nightly_build:
+    name: Nightly Zig Compile and run Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    continue-on-error: true
+
+    steps:
+        - uses: actions/checkout@v3
+        - uses: mlugg/setup-zig@v1
+          with:
+            version: master
+        - name: Display Zig version
+          run: zig version
+          shell: bash  # Use bash shell to ensure compatibility
+        - name: Check Nightly build and test
+          run: |
+            echo "Check Nightly build and test"
+            if zig build test --summary all; then
+              echo -e "\033[0;32mNightly build succeeded.\033[0m"
+            else
+              echo -e "\033[0;31mNightly build failed.\033[0m"
+            fi
+          shell: bash  # Use bash shell to ensure compatibility
+        - name: Force Success
+          if: always()  # This step runs regardless of previous step success/failure
+          run: |
+            echo "Forcing job to succeed."
+            exit 0
+          shell: bash  # Use bash shell to ensure compatibility
