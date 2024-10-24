@@ -162,7 +162,7 @@ const App = struct {
                 const style = self.chooseColor(item.branch_type);
                 const branch_str = "/";
 
-                _ = try win.printSegment(.{ .text = branch_str, .style = item.style }, .{
+                _ = win.printSegment(.{ .text = branch_str, .style = item.style }, .{
                     .col_offset = item.x,
                     .row_offset = item.y,
                 });
@@ -183,7 +183,7 @@ const App = struct {
                     });
                     verbose_child.clear();
 
-                    _ = try verbose_child.printSegment(.{ .text = msg, .style = style }, .{});
+                    _ = verbose_child.printSegment(.{ .text = msg, .style = style }, .{});
                 }
             }
 
@@ -271,7 +271,7 @@ const App = struct {
                 try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
                 const win = self.vx.window();
                 const center = vaxis.widgets.alignment.center(win, 50, 3);
-                _ = try center.printSegment(.{ .text = 
+                _ = center.printSegment(.{ .text = 
                 \\Oops, resize needs to be implemented still...
                 \\Press Ctrl+C to exit the program and run again
                 }, .{});
@@ -317,7 +317,7 @@ const App = struct {
             self.args.saveFile,
             self.args.loadFile,
         });
-        _ = try win.printSegment(.{ .text = msg[0..], .style = .{} }, .{});
+        _ = win.printSegment(.{ .text = msg[0..], .style = .{} }, .{});
     }
 
     fn drawWins(self: *App) !void {
@@ -341,11 +341,11 @@ const App = struct {
                 const pot_child = win.child(.{
                     .x_off = x_pos,
                     .y_off = y_pos,
-                    .width = .{ .limit = 16 },
-                    .height = .{ .limit = 2 },
+                    .width = 16,
+                    .height = 2,
                 });
 
-                _ = try pot_child.printSegment(.{ .text = msg, .style = Styles.pot_style }, .{});
+                _ = pot_child.printSegment(.{ .text = msg, .style = Styles.pot_style }, .{});
 
                 const plant_base = &[_]vaxis.Segment{
                     .{ .text = "(", .style = Styles.pot_style },
@@ -358,17 +358,17 @@ const App = struct {
                 const plant_base_child = win.child(.{
                     .x_off = x_pos,
                     .y_off = y_pos -| 1,
-                    .width = .{ .limit = 15 },
-                    .height = .{ .limit = 1 },
+                    .width = 15,
+                    .height = 1,
                 });
 
-                var plant_base_offset: usize = 0;
+                var plant_base_offset: u16 = 0;
                 for (plant_base) |seg| {
-                    _ = try plant_base_child.printSegment(seg, .{
+                    _ = plant_base_child.printSegment(seg, .{
                         .col_offset = plant_base_offset,
                         .wrap = .none,
                     });
-                    plant_base_offset += seg.text.len;
+                    plant_base_offset += @truncate(seg.text.len);
                 }
             },
             .large => {
@@ -384,11 +384,11 @@ const App = struct {
                 const pot_child = win.child(.{
                     .x_off = x_pos,
                     .y_off = y_pos,
-                    .width = .{ .limit = 33 },
-                    .height = .{ .limit = 3 },
+                    .width = 33,
+                    .height = 3,
                 });
 
-                _ = try pot_child.printSegment(.{ .text = msg, .style = Styles.pot_style }, .{});
+                _ = pot_child.printSegment(.{ .text = msg, .style = Styles.pot_style }, .{});
 
                 const plant_base = &[_]vaxis.Segment{
                     .{ .text = ":", .style = Styles.pot_style },
@@ -401,17 +401,17 @@ const App = struct {
                 const plant_base_child = win.child(.{
                     .x_off = x_pos +| 2,
                     .y_off = y_pos -| 1,
-                    .width = .{ .limit = 32 },
-                    .height = .{ .limit = 1 },
+                    .width = 32,
+                    .height = 1,
                 });
 
-                var plant_base_offset: usize = 0;
+                var plant_base_offset: u16 = 0;
                 for (plant_base) |seg| {
-                    _ = try plant_base_child.printSegment(seg, .{
+                    _ = plant_base_child.printSegment(seg, .{
                         .col_offset = plant_base_offset,
                         .wrap = .none,
                     });
-                    plant_base_offset += seg.text.len;
+                    plant_base_offset += @truncate(seg.text.len);
                 }
             },
         }
@@ -425,10 +425,10 @@ const App = struct {
             const mid_x = (win.width / 2) +| (win.width / 4);
 
             // Bound size_x to 34 at most
-            const child_size_x: usize = if (msg.len > 30) 34 else msg.len + 5;
+            const child_size_x: u16 = if (msg.len > 30) 34 else @as(u16, @truncate(msg.len)) + 5;
             // Message box at least size_y of 3
             // Each 30 characters will add another line characters
-            const child_size_y: usize = @divFloor(msg.len, 30) + 3;
+            const child_size_y: u16 = @divFloor(@as(u16, @truncate(msg.len)), 30) + 3;
 
             const x_pos = mid_x -| (child_size_x / 4);
             const y_pos = (win.height / 2);
@@ -437,8 +437,8 @@ const App = struct {
             const message_child = win.child(.{
                 .x_off = x_pos,
                 .y_off = y_pos,
-                .width = .{ .limit = child_size_x },
-                .height = .{ .limit = child_size_y },
+                .width = child_size_x,
+                .height = child_size_y,
                 .border = .{ .where = .all, .glyphs = .{ .custom = custom_border } },
             });
 
@@ -446,9 +446,11 @@ const App = struct {
             while (index < msg.len) : (index += 30) {
                 const end = index + 30;
                 if (end < msg.len) {
-                    _ = try message_child.printSegment(.{ .text = msg[index..end] }, .{ .col_offset = 1, .row_offset = @divFloor(index, 30) });
+                    _ = message_child.printSegment(.{ 
+                        .text = msg[index..end] }, 
+                        .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
                 } else {
-                    _ = try message_child.printSegment(.{ .text = msg[index..] }, .{ .col_offset = 1, .row_offset = @divFloor(index, 30) });
+                    _ = message_child.printSegment(.{ .text = msg[index..] }, .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
                 }
             }
         }
@@ -470,7 +472,7 @@ const App = struct {
                     .height = .{ .limit = y_max },
                 });
 
-                _ = try tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
+                _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
             },
             .small => {
                 const x_pos = (self.getTreeWinMaxX() / 2) -| 1;
@@ -483,7 +485,7 @@ const App = struct {
                     .height = .{ .limit = y_max },
                 });
 
-                _ = try tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
+                _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
             },
             .large => {
                 const x_pos = (self.getTreeWinMaxX() / 2) -| 1;
@@ -496,7 +498,7 @@ const App = struct {
                     .height = .{ .limit = y_max },
                 });
 
-                _ = try tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
+                _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
             },
         }
     }
@@ -504,8 +506,8 @@ const App = struct {
     /// Gets the starting position to grow the tree,
     /// calls self.branch which recursively draws the tree
     fn growTree(self: *App, myCounters: *Counters) !void {
-        var maxX: usize = 0;
-        var maxY: usize = 0;
+        var maxX: u16 = 0;
+        var maxY: u16 = 0;
 
         maxX = self.getTreeWinMaxX();
         maxY = self.getTreeWinMaxY();
@@ -522,7 +524,7 @@ const App = struct {
     }
 
     /// Recursively draws the parts of the tree
-    fn branch(self: *App, myCounters: *Counters, x_input: usize, y_input: usize, branch_type: branchType, life_input: usize) !void {
+    fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_type: branchType, life_input: usize) !void {
         var x = x_input;
         var y = y_input;
         var life = life_input;
@@ -596,25 +598,25 @@ const App = struct {
                 const verbose_child = win.child(.{
                     .x_off = 5,
                     .y_off = 2,
-                    .width = .{ .limit = 30 },
-                    .height = .{ .limit = 4 },
+                    .width = 30,
+                    .height = 4,
                 });
                 verbose_child.clear();
 
-                _ = try verbose_child.printSegment(.{ .text = msg }, .{});
+                _ = verbose_child.printSegment(.{ .text = msg }, .{});
             }
 
             // move in x and y directions
             if (dx > 0) {
-                x +|= @as(usize, @intCast(@abs(dx)));
+                x +|= @as(u16, @intCast(@abs(dx)));
             } else {
-                x -|= @as(usize, @intCast(@abs(dx)));
+                x -|= @as(u16, @intCast(@abs(dx)));
             }
 
             if (dy > 0) {
-                y +|= @as(usize, @intCast(@abs(dy)));
+                y +|= @as(u16, @intCast(@abs(dy)));
             } else {
-                y -|= @as(usize, @intCast(@abs(dy)));
+                y -|= @as(u16, @intCast(@abs(dy)));
             }
 
             // Choose color for this branch
@@ -629,7 +631,7 @@ const App = struct {
             const tree_child = win.child(.{
                 .x_off = x_pos,
                 .y_off = y_pos,
-                .height = .{ .limit = y_max },
+                .height = y_max,
             });
 
             // TODO: Only print segments that don't overlap too harshly with
@@ -640,7 +642,7 @@ const App = struct {
             // }
 
             // Draw branch regardless of string length
-            _ = try tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
+            _ = tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
 
             // if live, update screen
             // skip updating if we're still loading from file
@@ -911,7 +913,7 @@ const App = struct {
     }
 
     /// Get Max Y bounds for the tree, based on baseType
-    fn getTreeWinMaxY(self: *App) usize {
+    fn getTreeWinMaxY(self: *App) u16 {
         const win = self.vx.window();
 
         return switch (self.args.baseType) {
@@ -922,7 +924,7 @@ const App = struct {
     }
 
     /// Get Max X bounds for the tree, based on baseType
-    fn getTreeWinMaxX(self: *App) usize {
+    fn getTreeWinMaxX(self: *App) u16 {
         const win = self.vx.window();
 
         return switch (self.args.baseType) {
