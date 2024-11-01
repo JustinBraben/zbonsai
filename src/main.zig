@@ -247,12 +247,23 @@ const App = struct {
                 pass_finished = true;
             }
 
-            // It's best to use a buffered writer for the render method. TTY provides one, but you
-            // may use your own. The provided bufferedWriter has a buffer size of 4096
-            var buffered = self.tty.bufferedWriter();
-            // Render the application to the screen
-            try self.vx.render(buffered.writer().any());
-            try buffered.flush();
+            if (self.args.printTree) {
+                self.should_quit = true;
+            }
+            else {
+                // It's best to use a buffered writer for the render method. TTY provides one, but you
+                // may use your own. The provided bufferedWriter has a buffer size of 4096
+                var buffered = self.tty.bufferedWriter();
+                // Render the application to the screen
+                try self.vx.render(buffered.writer().any());
+                try buffered.flush();
+            }
+        }
+
+        // If -p flag passed to program, print the tree to terminal after completion
+        if (self.args.printTree) {
+            try self.vx.exitAltScreen(self.tty.anyWriter());
+            try self.vx.prettyPrint(self.tty.anyWriter());
         }
     }
 
