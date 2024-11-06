@@ -1,5 +1,5 @@
 .{
-    .name = "new-bonsai",
+    .name = "zbonsai",
     .version = "0.1.0",
     .dependencies = .{
         .vaxis = .{
