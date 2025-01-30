@@ -2,6 +2,8 @@ const std = @import("std");
 const vaxis = @import("vaxis");
 const Window = vaxis.Window;
 
+// Consider removing, functionality in libvaxis now I believe
+
 const Progressbar = @This();
 
 /// character to use for the Progressbar
