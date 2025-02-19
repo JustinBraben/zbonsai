@@ -46,10 +46,10 @@ pub const Args = struct {
             \\
             \\-i, --infinite            Infinite mode: keep growing trees.
             \\-w, --wait <TIME>         In infinite mode, wait TIME between each tree
-            \\                              generation [default: 4.00].
+            \\                          generation [default: 4.00].
             \\
-            \\-S, --screensaver         Screensaver mode; equivalent to -liWC and
-            \\                              quit on any keypress.
+            \\-S, --screensaver         Screensaver mode; equivalent to -li and
+            \\                          quit on any keypress.
             \\
             \\-m, --message <STR>       Attach message next to the tree.
             \\-b, --base <BASETYPE>     Ascii-art plant base to use, 0 is none.
@@ -57,7 +57,7 @@ pub const Args = struct {
             \\                          for leaves.
             \\
             \\-M, --multiplier <USIZE>  Branch multiplier; higher -> more
-            \\                              branching (0-20) [default: 5].
+            \\                          branching (0-20) [default: 5].
             \\
             \\-L, --life <USIZE>        Life; higher -> more growth (0-200) [default: 32].
             \\-p, --print               Print tree to terminal when finished.
