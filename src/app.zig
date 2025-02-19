@@ -567,17 +567,23 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         const win = self.vx.window();
 
         if (self.args.verbosity != .none) {
-            const msg = try std.fmt.allocPrint(self.arena.allocator(),
+            var buffer: [200]u8 = undefined;
+            const buf = buffer[0..];
+
+            const msg = try std.fmt.bufPrint(buf, 
+            \\maxX: {d}, maxY: {d}
+                \\
                 \\dx: {d}
                 \\dy: {d}
                 \\type: {s}
                 \\shootCooldown: {d}
-            , .{ dx, dy, @tagName(branch_type), shootCooldown });
+            , .{ win.width, win.height, dx, dy, @tagName(branch_type), shootCooldown });
+
             const verbose_child = win.child(.{
                 .x_off = 5,
                 .y_off = 2,
                 .width = 30,
-                .height = 4,
+                .height = 6,
             });
             verbose_child.clear();
 
