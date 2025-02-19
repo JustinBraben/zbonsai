@@ -6,7 +6,7 @@ const print = debug.print;
 const io = std.io;
 const builtin = std.builtin;
 
-const Args = @import("args.zig").Args;
+const Args = @import("args.zig");
 const App = @import("app.zig");
 
 pub fn main() !void {

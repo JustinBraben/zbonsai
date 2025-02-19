@@ -6,9 +6,9 @@ const print = debug.print;
 const io = std.io;
 const builtin = std.builtin;
 
-const BaseType = @import("base_type.zig").BaseType;
+const Args = @import("args.zig");
+const BaseType = Args.BaseType;
 const Styles = @import("styles.zig");
-const Args = @import("args.zig").Args;
 const Dice = @import("dice.zig");
 const Tree = @import("tree.zig");
 
@@ -57,6 +57,7 @@ should_quit: bool,
 tty: vaxis.Tty,
 /// The vaxis instance
 vx: vaxis.Vaxis,
+loop: vaxis.Loop(Event),
 /// Roll the dice for Random number generator
 dice: Dice,
 /// Arguments passed in from command line
@@ -71,6 +72,7 @@ pub fn init(allocator: Allocator, args: Args) !App {
         .should_quit = false,
         .tty = try vaxis.Tty.init(),
         .vx = try vaxis.init(allocator, .{}),
+        .loop = undefined,
         .dice = Dice.initWithSeed(args.seed),
         .args = args,
         .tree = Tree.init(allocator, .{
@@ -173,14 +175,12 @@ pub fn new_run(self: *App) !void {
 }
 
 pub fn run(self: *App) !void {
-    var loop: vaxis.Loop(Event) = .{
+    self.loop = .{
         .tty = &self.tty,
         .vaxis = &self.vx,
     };
-    try loop.init();
-
-    // Start the event loop. Events will now be queued
-    try loop.start();
+    try self.loop.init();
+    try self.loop.start();
 
     try self.vx.enterAltScreen(self.tty.anyWriter());
 
@@ -198,9 +198,9 @@ pub fn run(self: *App) !void {
     // Main event loop
     while (!self.should_quit) {
         // pollEvent blocks until we have an event
-        loop.pollEvent();
+        self.loop.pollEvent();
         // tryEvent returns events until the queue is empty
-        while (loop.tryEvent()) |event| {
+        while (self.loop.tryEvent()) |event| {
             try self.update(event);
         }
 
@@ -514,6 +514,22 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
     var shootCooldown = self.args.multiplier;
 
     while (life > 0) {
+        // tryEvent returns events until the queue is empty
+        while (self.loop.tryEvent()) |event| {
+            switch (event) {
+                .key_press => |key| {
+                    if (key.matches('c', .{ .ctrl = true })) {
+                        self.should_quit = true;
+                        return;
+                    }
+                },
+                else => {},
+            }
+        }
+
+        // Exit if should_quit is set
+        if (self.should_quit) return;
+
         // decrement remaining life counter
         life -|= 1;
         age = self.args.lifeStart -| life;
