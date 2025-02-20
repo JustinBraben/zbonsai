@@ -16,7 +16,7 @@ const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
 
-const branchType = Tree.BranchType;
+const BranchType = Tree.BranchType;
 
 /// Set the default panic handler to the vaxis panic_handler. This will clean up the terminal if any
 /// panics occur
@@ -92,88 +92,6 @@ pub fn deinit(self: *App) void {
     // if (!self.args.printTree) {}
 }
 
-pub fn new_run(self: *App) !void {
-    var loop: vaxis.Loop(Event) = .{
-        .tty = &self.tty,
-        .vaxis = &self.vx,
-    };
-    try loop.init();
-
-    // Start the event loop. Events will now be queued
-    try loop.start();
-
-    try self.vx.enterAltScreen(self.tty.anyWriter());
-
-    // Query the terminal to detect advanced features, such as kitty keyboard protocol, etc.
-    // This will automatically enable the features in the screen you are in, so you will want to
-    // call it after entering the alt screen if you are a full screen application. The second
-    // arg is a timeout for the terminal to send responses. Typically the response will be very
-    // fast, however it could be slow on ssh connections.
-    try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
-
-    var win = self.vx.window();
-
-    // Main event loop
-    while (!self.should_quit) {
-        // pollEvent blocks until we have an event
-        // loop.pollEvent();
-        // tryEvent returns events until the queue is empty
-        while (loop.tryEvent()) |event| {
-            try self.update(event);
-        }
-
-        win.clear();
-        try self.drawWins();
-        try self.drawMessage();
-
-        try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
-        self.tree.updateLife();
-
-        for (self.tree.branches.items) |item| {
-            const style = self.chooseColor(item.branch_type);
-            const branch_str = "/";
-
-            _ = win.printSegment(.{ .text = branch_str, .style = item.style }, .{
-                .col_offset = item.x,
-                .row_offset = item.y,
-            });
-
-            if (self.args.verbosity != .none) {
-                const msg = try std.fmt.allocPrint(self.arena.allocator(),
-                    \\x: {d}
-                    \\y: {d}
-                    \\type: {s}
-                    \\shootLeftCounter: {d}
-                    \\shootRightCounter: {d}
-                , .{ item.x, item.y, @tagName(item.branch_type), self.tree.shootLeftCounter(), self.tree.shootRightCounter() });
-                const verbose_child = win.child(.{
-                    .x_off = 5,
-                    .y_off = 2,
-                    .width = .{ .limit = 30 },
-                    .height = .{ .limit = 6 },
-                });
-                verbose_child.clear();
-
-                _ = verbose_child.printSegment(.{ .text = msg, .style = style }, .{});
-            }
-        }
-
-        // If drawing live, add sleep to show
-        // live drawing
-        if (self.args.live) {
-            const ms: u64 = @intFromFloat(self.args.timeStep * std.time.ms_per_s);
-            std.time.sleep(ms * std.time.ns_per_ms);
-        }
-
-        // It's best to use a buffered writer for the render method. TTY provides one, but you
-        // may use your own. The provided bufferedWriter has a buffer size of 4096
-        var buffered = self.tty.bufferedWriter();
-        // Render the application to the screen
-        try self.vx.render(buffered.writer().any());
-        try buffered.flush();
-    }
-}
-
 pub fn run(self: *App) !void {
     self.loop = .{
         .tty = &self.tty,
@@ -220,10 +138,7 @@ pub fn run(self: *App) !void {
             self.should_quit = true;
         }
         else {
-            // It's best to use a buffered writer for the render method. TTY provides one, but you
-            // may use your own. The provided bufferedWriter has a buffer size of 4096
             var buffered = self.tty.bufferedWriter();
-            // Render the application to the screen
             try self.vx.render(buffered.writer().any());
             try buffered.flush();
         }
@@ -502,7 +417,7 @@ fn growTree(self: *App, myCounters: *Counters) !void {
 }
 
 /// Recursively draws the parts of the tree
-fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_type: branchType, life_input: usize) !void {
+fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_type: BranchType, life_input: usize) !void {
     var x = x_input;
     var y = y_input;
     var life = life_input;
@@ -653,7 +568,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
 }
 
 /// Determine which way the tree shoot draw towards
-fn setDeltas(self: *App, branch_type: branchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
+fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
     var dice: i64 = 0;
 
     switch (branch_type) {
@@ -782,7 +697,7 @@ fn setDeltas(self: *App, branch_type: branchType, life: usize, age: usize, multi
 }
 
 /// Return vaxis style for color of tree parts
-fn chooseColor(self: *App, branch_type: branchType) vaxis.Style {
+fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     switch (branch_type) {
         .trunk, .shootLeft, .shootRight => {
             if (self.dice.rollI64(2) == 0) {
@@ -824,7 +739,7 @@ fn chooseColor(self: *App, branch_type: branchType) vaxis.Style {
 }
 
 /// Return a String for the tree
-fn chooseString(self: *App, branch_type_input: branchType, life: usize, dx: i64, dy: i64) ![]const u8 {
+fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) ![]const u8 {
     var branch_type = branch_type_input;
 
     const default = "?";
