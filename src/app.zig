@@ -442,9 +442,6 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
             }
         }
 
-        // Exit if should_quit is set
-        if (self.should_quit) return;
-
         // decrement remaining life counter
         life -|= 1;
         age = self.args.lifeStart -| life;
@@ -741,90 +738,62 @@ fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
 /// Return a String for the tree
 fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) ![]const u8 {
     var branch_type = branch_type_input;
-
-    const default = "?";
-    const max_str_len: usize = 32;
-    var branch_str: []u8 = undefined;
-    branch_str = try self.arena.allocator().alloc(u8, default.len);
-    std.mem.copyForwards(u8, branch_str, "?");
-
     if (life < 4) branch_type = .dying;
 
+    var result: []const u8 = undefined;
+    
     switch (branch_type) {
         .trunk => {
             if (dy == 0) {
-                const str = "/~";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/~";
             } else if (dx < 0) {
-                const str = "\\|";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "\\|";
             } else if (dx == 0) {
-                const str = "/|\\";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/|\\";
             } else if (dx > 0) {
-                const str = "|/";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "|/";
+            } else {
+                result = "?";
             }
         },
         .shootLeft => {
             if (dy > 0) {
-                const str = "\\";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "\\";
             } else if (dy == 0) {
-                const str = "\\_";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, "\\_");
+                result = "\\_";
             } else if (dx < 0) {
-                const str = "\\|";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "\\|";
             } else if (dx == 0) {
-                const str = "/|";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/|";
             } else if (dx > 0) {
-                const str = "/";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/";
+            } else {
+                result = "?";
             }
         },
         .shootRight => {
             if (dy > 0) {
-                const str = "/";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/";
             } else if (dy == 0) {
-                const str = "_/";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "_/";
             } else if (dx < 0) {
-                const str = "\\|";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "\\|";
             } else if (dx == 0) {
-                const str = "/|";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/|";
             } else if (dx > 0) {
-                const str = "/";
-                branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-                std.mem.copyForwards(u8, branch_str, str);
+                result = "/";
+            } else {
+                result = "?";
             }
         },
         .dying, .dead => {
-            const rand_index = self.dice.rollUsize(max_str_len);
-            const str = self.args.leaves[0..rand_index];
-            branch_str = try self.arena.allocator().realloc(branch_str, str.len);
-            std.mem.copyForwards(u8, branch_str, str);
+            const rand_index = self.dice.rollUsize(self.args.leaves.len);
+            result = self.args.leaves[0..rand_index];
         },
     }
-
-    return branch_str;
+    
+    // Create a durable copy in the arena
+    return try self.arena.allocator().dupe(u8, result);
 }
 
 /// Get Max Y bounds for the tree, based on baseType
