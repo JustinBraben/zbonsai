@@ -44,7 +44,6 @@ const Event = union(enum) {
     /// Signals window size has changed.
     /// This event guarenteed sent when the loop is started.
     winsize: vaxis.Winsize,
-    grow_tree: bool,
 };
 
 const App = @This();
@@ -170,11 +169,6 @@ pub fn update(self: *App, event: Event) !void {
             \\Oops, resize needs to be implemented still...
             \\Press Ctrl+C to exit the program and run again
             }, .{});
-        },
-        .grow_tree => |gt| {
-            _ = gt;
-            try self.tree.growTree(self.getTreeWinMaxX(), self.getTreeWinMaxY());
-            self.tree.updateLife();
         },
         else => {},
     }
