@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .root_source_file = b.path("src/tests.zig"),
         .test_runner = .{ 
-            .path = b.path("test_runner.zig"),
+            .path = b.path("test/test_runner.zig"),
             .mode = .simple,
         },
         .target = target,
