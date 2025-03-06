@@ -42,7 +42,10 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     const unit_tests = b.addTest(.{
         .root_source_file = b.path("src/tests.zig"),
-        .test_runner = b.path("test_runner.zig"),
+        .test_runner = .{ 
+            .path = b.path("test_runner.zig"),
+            .mode = .simple,
+        },
         .target = target,
         .optimize = optimize,
     });

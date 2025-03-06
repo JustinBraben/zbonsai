@@ -1,21 +1,22 @@
 const std = @import("std");
+const Random = std.Random;
 const testing = std.testing;
 
 /// Object used to generate Random numbers for the main App
 const Dice = @This();
 
 seed: u64 = 0,
-rand: std.rand.Xoshiro256,
+rand: Random.Xoshiro256,
 
 pub fn initWithGeneratedSeed() Dice {
     return .{
-        .rand = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp()))),
+        .rand = Random.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp()))),
     };
 }
 
 pub fn initWithSeed(input_seed: u64) Dice {
     return .{
-        .rand = std.rand.DefaultPrng.init(input_seed),
+        .rand = Random.DefaultPrng.init(input_seed),
     };
 }
 

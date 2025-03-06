@@ -127,25 +127,6 @@ pub fn processBranch(self: *Tree, branch: Branch) !void {
     // }
 }
 
-//         // // Roughly how the former recursive function operated
-//         // // TODO: Implement in the non-recursive way
-//         // if (branch.life < 3) {try createDeadBranch(branch);}
-//         // else if (branch.branch_type == .trunk and branch.life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
-//         // else if ((branch.branch_type == .shootLeft or branch.branch_type == .shootRight) and life < (self.options.multiplier + 2)) {try createDyingBranch(branch);}
-//         // else if ((branch.branch_type == .trunk and ()) or (branch.life % self.options.multiplier == 0)){
-//         //     // if trunk is branching and not about to die, create another trunk with random life
-//         // 	if ((rand() % 8 == 0) && life > 7) {
-//         // 		shootCooldown = conf->multiplier * 2;	// reset shoot cooldown
-//         // 		branch(conf, objects, myCounters, y, x, trunk, life + (rand() % 5 - 2));
-//         // 	}
-//         //     // otherwise a shoot
-//         //     else if (shootCooldown <= 0) {
-
-//         //     }
-//         // }
-//     }
-// }
-
 fn createNewBranch(self: *Tree, branch: Branch, dx: i64, dy: i64, new_branch_type: BranchType) !void {
     var x = branch.x;
     var y = branch.y;

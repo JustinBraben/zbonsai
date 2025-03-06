@@ -23,7 +23,7 @@ pub fn main() !void {
 
     // By default leaves will just be '&'
     var leavesInput: [128]u8 = .{'&'} ** 128;
-    var tokens = std.mem.tokenize(u8, &leavesInput, ",");
+    var tokens = std.mem.tokenizeScalar(u8, &leavesInput, ',');
     while (tokens.next()) |token| {
         if (args.leavesSize < 100) {
             args.leaves[args.leavesSize] = token[0];
