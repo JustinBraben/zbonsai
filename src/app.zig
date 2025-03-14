@@ -189,7 +189,10 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
 /// For debugging, used to view args values in the terminal window
 pub fn drawConfig(self: *App) !void {
     const win = self.vx.window();
-    const msg = try std.fmt.allocPrint(self.arena.allocator(),
+    var buffer: [300]u8 = undefined;
+    const buf = buffer[0..];
+
+    const msg = try std.fmt.bufPrint(buf,
         \\live: {}
         \\infinite: {}
         \\screensaver: {}
