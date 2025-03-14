@@ -487,7 +487,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         const win = self.vx.window();
 
         if (self.args.verbosity != .none) {
-            var buffer: [200]u8 = undefined;
+            var buffer: [300]u8 = undefined;
             const buf = buffer[0..];
 
             const msg = try std.fmt.bufPrint(buf, 
