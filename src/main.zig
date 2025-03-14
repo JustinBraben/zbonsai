@@ -1,3 +1,4 @@
+//! main.zig
 const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
@@ -29,12 +30,6 @@ pub fn main() !void {
             args.leaves[args.leavesSize] = token[0];
             args.leavesSize += 1;
         }
-    }
-
-    // If seed is 0, assumed that no seed was passed
-    // thus give the program a seed based on timestamp
-    if (args.seed == 0) {
-        args.seed = @as(u64, @intCast(std.time.timestamp()));
     }
 
     // Initialize our application

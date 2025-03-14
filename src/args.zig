@@ -1,7 +1,8 @@
-const clap = @import("clap");
+//! args.zig
 const std = @import("std");
 const io = std.io;
 const Allocator = std.mem.Allocator;
+const clap = @import("clap");
 
 const Args = @This();
 
@@ -29,7 +30,7 @@ verbosity: Verbosity,
 lifeStart: usize = 32,
 multiplier: usize = 5,
 baseType: BaseType,
-seed: u64,
+seed: ?u64,
 leavesSize: usize = 0,
 targetBranchCount: usize = 0,
 
@@ -136,9 +137,15 @@ pub fn parse_args(ally: Allocator) !Args {
     if (res.args.life) |ls|
         lifeStart = ls;
 
-    var seed: u64 = 0;
-    if (res.args.seed) |s|
+    var seed: ?u64 = null;
+    if (res.args.seed) |s| {
+        if (s == 0) return error.InvalidSeed;
         seed = s;
+    } else {
+        // If seed is null, no seed was passed
+        // thus give the program a seed based on timestamp
+        seed = @as(u64, @intCast(std.time.timestamp()));
+    }
 
     var timeStep: f32 = 0.03;
     if (res.args.time) |ts|

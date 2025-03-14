@@ -1,3 +1,4 @@
+//! styles.zig
 const vaxis = @import("vaxis");
 
 pub const pot_style: vaxis.Style = .{

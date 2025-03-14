@@ -1,3 +1,4 @@
+//! app.zig
 const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
@@ -10,13 +11,18 @@ const Args = @import("args.zig");
 const BaseType = Args.BaseType;
 const Styles = @import("styles.zig");
 const Dice = @import("dice.zig");
-const Tree = @import("tree.zig");
 
 const vaxis = @import("vaxis");
 const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
 
-const BranchType = Tree.BranchType;
+pub const BranchType = enum {
+    trunk,
+    shootLeft,
+    shootRight,
+    dying,
+    dead,
+};
 
 /// Set the default panic handler to the vaxis panic_handler. This will clean up the terminal if any
 /// panics occur
@@ -61,8 +67,6 @@ loop: vaxis.Loop(Event),
 dice: Dice,
 /// Arguments passed in from command line
 args: Args,
-/// Tree to draw
-tree: Tree,
 
 pub fn init(allocator: Allocator, args: Args) !App {
     return .{
@@ -72,23 +76,14 @@ pub fn init(allocator: Allocator, args: Args) !App {
         .tty = try vaxis.Tty.init(),
         .vx = try vaxis.init(allocator, .{}),
         .loop = undefined,
-        .dice = Dice.initWithSeed(args.seed),
+        .dice = Dice.init(args.seed),
         .args = args,
-        .tree = Tree.init(allocator, .{
-            .life_start = args.lifeStart,
-            .multiplier = args.multiplier,
-        }),
     };
 }
 
 pub fn deinit(self: *App) void {
     self.vx.deinit(self.allocator, self.tty.anyWriter());
     self.tty.deinit();
-    self.tree.deinit();
-
-    // TODO: if printTree is set, print the final product of the tree
-    // to the terminal window. Give back user access
-    // if (!self.args.printTree) {}
 }
 
 pub fn run(self: *App) !void {

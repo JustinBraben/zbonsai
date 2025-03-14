@@ -1,3 +1,4 @@
+//! dice.zig
 const std = @import("std");
 const Random = std.Random;
 const testing = std.testing;
@@ -5,19 +6,21 @@ const testing = std.testing;
 /// Object used to generate Random numbers for the main App
 const Dice = @This();
 
-seed: u64 = 0,
 rand: Random.Xoshiro256,
 
-pub fn initWithGeneratedSeed() Dice {
-    return .{
-        .rand = Random.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp()))),
-    };
-}
-
-pub fn initWithSeed(input_seed: u64) Dice {
-    return .{
-        .rand = Random.DefaultPrng.init(input_seed),
-    };
+/// Initialize Dice
+/// If null is passed, create seed based on timestamp
+pub fn init(seed: ?u64) Dice {
+    if (seed) |s| {
+        return .{
+            .rand = Random.DefaultPrng.init(s),
+        };
+    } else {
+        const timestamp = @as(u64, @intCast(std.time.timestamp()));
+        return .{
+            .rand = Random.DefaultPrng.init(timestamp),
+        };
+    }
 }
 
 /// Roll the dice for a usize
