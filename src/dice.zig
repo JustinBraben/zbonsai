@@ -44,7 +44,7 @@ fn rollI64WithinBounds(actual: i64, lower: i64, upper: i64) bool {
 }
 
 test "Dice rolls" {
-    var dice = Dice.initWithGeneratedSeed();
+    var dice = Dice.init(null);
 
     const roll_1 = dice.rollI64(10);
     const roll_2 = dice.rollI64(10);

@@ -52,7 +52,7 @@ first_grow: bool = true,
 pub fn init(allocator: Allocator, options: TreeOptions) Tree {
     return .{
         .allocator = allocator,
-        .dice = Dice.initWithSeed(options.seed),
+        .dice = Dice.init(options.seed),
         .options = options,
         .branches = ArrayList(Branch).init(allocator),
         .first_grow = true,
