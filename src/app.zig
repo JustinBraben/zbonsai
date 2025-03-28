@@ -95,19 +95,12 @@ pub fn run(self: *App) !void {
     try self.loop.start();
 
     try self.vx.enterAltScreen(self.tty.anyWriter());
-
-    // Query the terminal to detect advanced features, such as kitty keyboard protocol, etc.
-    // This will automatically enable the features in the screen you are in, so you will want to
-    // call it after entering the alt screen if you are a full screen application. The second
-    // arg is a timeout for the terminal to send responses. Typically the response will be very
-    // fast, however it could be slow on ssh connections.
     try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
 
     var myCounters = std.mem.zeroes(Counters);
 
     var pass_finished = false;
 
-    // Main event loop
     while (!self.should_quit) {
         // pollEvent blocks until we have an event
         self.loop.pollEvent();
@@ -149,9 +142,6 @@ pub fn run(self: *App) !void {
 pub fn update(self: *App, event: Event) !void {
     switch (event) {
         .key_press => |key| {
-            // key.matches does some basic matching algorithms. Key matching can be complex in
-            // the presence of kitty keyboard encodings, this will generally be a good approach.
-            // There are other matching functions available for specific purposes, as well
             if (key.matches('c', .{ .ctrl = true })) {
                 self.should_quit = true;
             }
@@ -170,8 +160,6 @@ pub fn update(self: *App, event: Event) !void {
 }
 
 pub fn updateScreen(self: *App, timeStep: f32) !void {
-    // It's best to use a buffered writer for the render method. TTY provides one, but you
-    // may use your own. The provided bufferedWriter has a buffer size of 4096
     var buffered = self.tty.bufferedWriter();
     // Render the application to the screen
     try self.vx.render(buffered.writer().any());
