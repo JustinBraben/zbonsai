@@ -429,8 +429,16 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         self.setDeltas(branch_type, life, age, self.args.multiplier, &dx, &dy);
 
         const maxY = self.getTreeWinMaxY();
-        // reduce dy if too close to the ground
-        if (dy > 0 and y > (maxY -| 2)) dy -= 1;
+        // Reduce dy if too close to the ground
+        if (dy > 0 and y > (maxY -| 3)) dy = 0;
+
+        // Boundary checks
+        const maxX = self.getTreeWinMaxX();
+        if (x < 2 or x > maxX -| 2) {
+            // Redirect branches that are too close to screen edge
+            if (x < 2) dx = 1;
+            if (x > maxX -| 2) dx = -1;
+        }
 
         // near-dead branch should branch into a lot of leaves
         if (life < 3) {
@@ -470,6 +478,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
             }
         }
 
+        // Decrement shoot cooldown
         shootCooldown -|= 1;
 
         const win = self.vx.window();
@@ -498,43 +507,40 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
             _ = verbose_child.printSegment(.{ .text = msg }, .{});
         }
 
-        // move in x and y directions
+        // Move in x and y directions with boundary checking
         if (dx > 0) {
-            x +|= @as(u16, @intCast(@abs(dx)));
-        } else {
-            x -|= @as(u16, @intCast(@abs(dx)));
+            x = @min(x +| @as(u16, @intCast(@abs(dx))), self.getTreeWinMaxX() -| 2);
+        } else if (dx < 0) {
+            x = if (x > @as(u16, @intCast(@abs(dx)))) 
+                x -| @as(u16, @intCast(@abs(dx)))
+            else 
+                1;
         }
 
         if (dy > 0) {
-            y +|= @as(u16, @intCast(@abs(dy)));
-        } else {
-            y -|= @as(u16, @intCast(@abs(dy)));
+            y = @min(y +| @as(u16, @intCast(@abs(dy))), self.getTreeWinMaxY());
+        } else if (dy < 0) {
+            y = if (y > @as(u16, @intCast(@abs(dy)))) 
+                y -| @as(u16, @intCast(@abs(dy)))
+            else 
+                1;
         }
 
         // Choose color for this branch
         const style = self.chooseColor(branch_type);
-
         const branch_str = try self.chooseString(branch_type, life, dx, dy);
 
-        const x_pos = x;
-        const y_pos = y;
-        const y_max = self.getTreeWinMaxY();
-
-        const tree_child = win.child(.{
-            .x_off = x_pos,
-            .y_off = y_pos,
-            .height = y_max,
+        // Draw branch
+        const tree_child = self.vx.window().child(.{
+            .x_off = x,
+            .y_off = y,
+            .height = self.getTreeWinMaxY(),
         });
 
-        // TODO: Only print segments that don't overlap too harshly with
-        // other parts of the tree
-        // const branch_str_width = try gwidth(branch_str, .wcwidth, &self.vx.unicode.width_data);
-        // if (branch_str_width > 0 and x % branch_str_width == 0) {
-        //     _ = try tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
-        // }
-
-        // Draw branch regardless of string length
-        _ = tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
+        // Draw branch only if we're within bounds
+        if (x <= self.getTreeWinMaxX() and y <= self.getTreeWinMaxY()) {
+            _ = tree_child.printSegment(.{ .text = branch_str, .style = style }, .{});
+        }
 
         // if live, update screen
         // skip updating if we're still loading from file
@@ -550,167 +556,196 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
 
     switch (branch_type) {
         .trunk => {
-
-            // new or dead trunk
+            // Base trunk - straighter with slight variations
             if (age <= 2 or life < 4) {
-                returnDy.* = 0;
-                returnDx.* = self.dice.rollI64(3) - 1;
+                returnDy.* = 0; // More consistent upward growth at start
+                returnDx.* = self.dice.rollI64(3) - 1; // Slight left/right variation
             }
-            // young trunk should grow wide
+            // Young trunk should grow more upward with some width
             else if (age < (multiplier * 3)) {
-                const res = @as(f32, @floatFromInt(multiplier)) * 0.5;
+                // More consistent upward growth for young trunk
+                if (age % 2 == 0) returnDy.* = -1 else returnDy.* = 0;
 
-                // every (multiplier * 0.5) steps, raise tree to next level
-                if (age % @as(usize, @intFromFloat(res)) == 0) returnDy.* = -1 else returnDy.* = 0;
-
-                dice = self.dice.rollI64(10);
-                if (dice >= 0 and dice <= 0) {
-                    returnDx.* = -2;
-                } else if (dice >= 1 and dice <= 3) {
-                    returnDx.* = -1;
-                } else if (dice >= 4 and dice <= 5) {
-                    returnDx.* = 0;
-                } else if (dice >= 6 and dice <= 8) {
-                    returnDx.* = 1;
-                } else if (dice >= 9 and dice <= 9) {
-                    returnDx.* = 2;
+                dice = self.dice.rollI64(12);
+                if (dice >= 0 and dice <= 1) {
+                    returnDx.* = -2; // Occasional strong left
+                } else if (dice >= 2 and dice <= 4) {
+                    returnDx.* = -1; // Slight left
+                } else if (dice >= 5 and dice <= 6) {
+                    returnDx.* = 0;  // Straight
+                } else if (dice >= 7 and dice <= 9) {
+                    returnDx.* = 1;  // Slight right
+                } else if (dice >= 10 and dice <= 11) {
+                    returnDx.* = 2;  // Occasional strong right
                 }
             }
-            // middle-age trunk
+            // Middle-aged trunk - more upward growth
             else {
                 dice = self.dice.rollI64(10);
-                if (dice > 2) {
-                    returnDy.* = -1;
+                if (dice > 1) {
+                    returnDy.* = -1; // More consistent upward growth (80%)
                 } else {
-                    returnDy.* = 0;
+                    returnDy.* = 0;  // Occasional pause in height (20%)
                 }
-                returnDx.* = self.dice.rollI64(3) - 1;
+
+                // Less horizontal movement for mature trunk
+                returnDx.* = if (self.dice.rollI64(5) == 0) 
+                    self.dice.rollI64(3) - 1 // Occasional horizontal movement
+                else 
+                    0; // Usually straight up for mature trunk
             }
         },
-        // trend left and a little vertical movement
+        // Shoots trend left or right with some vertical variation
         .shootLeft => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 7) {
-                returnDy.* = 0;
-            } else if (dice >= 8 and dice <= 9) {
-                returnDy.* = 1;
+            // More sophisticated vertical movement
+            dice = self.dice.rollI64(12);
+            if (dice >= 0 and dice <= 2) {
+                returnDy.* = -1; // 25% chance to grow upward
+            } else if (dice >= 3 and dice <= 8) {
+                returnDy.* = 0;  // 50% chance to grow level
+            } else if (dice >= 9 and dice <= 11) {
+                returnDy.* = 1;  // 25% chance to grow downward
             }
 
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDx.* = -2;
-            } else if (dice >= 2 and dice <= 5) {
-                returnDx.* = -1;
-            } else if (dice >= 6 and dice <= 8) {
-                returnDx.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDx.* = 1;
+            // Strong left bias for left shoots
+            dice = self.dice.rollI64(12);
+            if (dice >= 0 and dice <= 2) {
+                returnDx.* = -2; // Strong left
+            } else if (dice >= 3 and dice <= 7) {
+                returnDx.* = -1; // Moderate left
+            } else if (dice >= 8 and dice <= 10) {
+                returnDx.* = 0;  // Sometimes straight
+            } else if (dice == 11) {
+                returnDx.* = 1;  // Rarely right (natural variation)
             }
         },
-        // trend right and a little vertical movement
         .shootRight => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 7) {
-                returnDy.* = 0;
-            } else if (dice >= 8 and dice <= 9) {
-                returnDy.* = 1;
+            // Similar vertical movement as shootLeft
+            dice = self.dice.rollI64(12);
+            if (dice >= 0 and dice <= 2) {
+                returnDy.* = -1; // 25% chance to grow upward
+            } else if (dice >= 3 and dice <= 8) {
+                returnDy.* = 0;  // 50% chance to grow level
+            } else if (dice >= 9 and dice <= 11) {
+                returnDy.* = 1;  // 25% chance to grow downward
             }
 
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDx.* = 2;
-            } else if (dice >= 2 and dice <= 5) {
-                returnDx.* = 1;
-            } else if (dice >= 6 and dice <= 8) {
-                returnDx.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDx.* = -1;
+            // Strong right bias for right shoots
+            dice = self.dice.rollI64(12);
+            if (dice >= 0 and dice <= 2) {
+                returnDx.* = 2;  // Strong right
+            } else if (dice >= 3 and dice <= 7) {
+                returnDx.* = 1;  // Moderate right
+            } else if (dice >= 8 and dice <= 10) {
+                returnDx.* = 0;  // Sometimes straight
+            } else if (dice == 11) {
+                returnDx.* = -1; // Rarely left (natural variation)
             }
         },
-        // discourage vertical growth(?); trend left/right (-3,3)
+        // Dying branches - more random for leaf clusters
         .dying => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 1) {
-                returnDy.* = -1;
-            } else if (dice >= 2 and dice <= 8) {
-                returnDy.* = 0;
-            } else if (dice >= 9 and dice <= 9) {
-                returnDy.* = 1;
+            // More vertical variation for leaf clusters
+            dice = self.dice.rollI64(15);
+            if (dice >= 0 and dice <= 4) {
+                returnDy.* = -1; // 33% up
+            } else if (dice >= 5 and dice <= 9) {
+                returnDy.* = 0;  // 33% level
+            } else if (dice >= 10 and dice <= 14) {
+                returnDy.* = 1;  // 33% down
             }
 
+            // Wide horizontal spread for foliage 
             dice = self.dice.rollI64(15);
-            if (dice >= 0 and dice <= 0) {
+            if (dice == 0) {
                 returnDx.* = -3;
-            } else if (dice >= 1 and dice <= 2) {
+            } else if (dice >= 1 and dice <= 3) {
                 returnDx.* = -2;
-            } else if (dice >= 3 and dice <= 5) {
-                returnDx.* = 1;
-            } else if (dice >= 6 and dice <= 8) {
+            } else if (dice >= 4 and dice <= 6) {
+                returnDx.* = -1;
+            } else if (dice >= 7 and dice <= 8) {
                 returnDx.* = 0;
             } else if (dice >= 9 and dice <= 11) {
                 returnDx.* = 1;
-            } else if (dice >= 12 and dice <= 13) {
+            } else if (dice >= 12 and dice <= 14) {
                 returnDx.* = 2;
-            } else if (dice >= 14 and dice <= 14) {
+            } else if (dice == 15) {
                 returnDx.* = 3;
             }
         },
+        // Dead branches - leaf endpoints
         .dead => {
-            dice = self.dice.rollI64(10);
-            if (dice >= 0 and dice <= 2) {
-                returnDy.* = -1;
-            } else if (dice >= 3 and dice <= 6) {
-                returnDy.* = 0;
-            } else if (dice >= 7 and dice <= 9) {
-                returnDy.* = 1;
+            // Even distribution of directions for leaves
+            dice = self.dice.rollI64(12);
+            if (dice >= 0 and dice <= 3) {
+                returnDy.* = -1; // 33% up
+            } else if (dice >= 4 and dice <= 7) {
+                returnDy.* = 0;  // 33% level 
+            } else if (dice >= 8 and dice <= 11) {
+                returnDy.* = 1;  // 33% down
             }
-            returnDx.* = self.dice.rollI64(3) - 1;
+
+            // Wide but controlled spread
+            dice = self.dice.rollI64(5);
+            returnDx.* = dice - 2; // Range from -2 to +2
         },
+    }
+
+    // Age-based adjustments to prevent excessive width for old trunks
+    if (branch_type == .trunk and age > multiplier * 5) {
+        // Bias toward upward growth for older trunks
+        if (self.dice.rollI64(10) > 2) {
+            returnDy.* = -1;
+            returnDx.* = 0;
+        }
     }
 }
 
 /// Return vaxis style for color of tree parts
 fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     switch (branch_type) {
-        .trunk, .shootLeft, .shootRight => {
-            if (self.dice.rollI64(2) == 0) {
-                return vaxis.Style{
-                    .fg = .{ .index = 11 },
-                    .bold = true,
-                };
-            } else {
-                return vaxis.Style{
-                    .fg = .{ .index = 3 },
-                };
-            }
+        .trunk => {
+            // Brown colors for trunk with varied intensity
+            const browns = [_]u8{ 94, 130, 136, 137, 173 }; // Various brown terminal colors
+            const idx = self.dice.rollUsize(browns.len);
+            const bold = self.dice.rollI64(4) == 0; // 25% chance of bold
+            
+            return vaxis.Style{
+                .fg = .{ .index = browns[idx] },
+                .bold = bold,
+            };
+        },
+        .shootLeft, .shootRight => {
+            // Lighter brown/green for shoots
+            const shoot_colors = [_]u8{ 130, 131, 136, 137, 138, 179 };
+            const idx = self.dice.rollUsize(shoot_colors.len);
+            const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
+            
+            return vaxis.Style{
+                .fg = .{ .index = shoot_colors[idx] },
+                .bold = bold,
+            };
         },
         .dying => {
-            if (self.dice.rollI64(10) == 0) {
-                return vaxis.Style{
-                    .fg = .{ .index = 2 },
-                    .bold = true,
-                };
-            } else {
-                return vaxis.Style{
-                    .fg = .{ .index = 2 },
-                };
-            }
+            // Greens for dying branches (which become leaves)
+            const greens = [_]u8{ 2, 22, 28, 34, 40, 46, 70, 76, 82, 112, 118 };
+            const idx = self.dice.rollUsize(greens.len);
+            const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
+            
+            return vaxis.Style{
+                .fg = .{ .index = greens[idx] },
+                .bold = bold,
+            };
         },
         .dead => {
-            if (self.dice.rollI64(3) == 0) {
-                return vaxis.Style{
-                    .fg = .{ .index = 10 },
-                    .bold = true,
-                };
-            } else {
-                return vaxis.Style{
-                    .fg = .{ .index = 10 },
-                };
-            }
+            // Brighter greens for leaves
+            const leaf_greens = [_]u8{ 10, 40, 46, 47, 48, 77, 78, 82, 83, 84, 85, 119, 120 };
+            const idx = self.dice.rollUsize(leaf_greens.len);
+            const bold = self.dice.rollI64(2) == 0; // 50% chance of bold for more vibrant leaves
+            
+            return vaxis.Style{
+                .fg = .{ .index = leaf_greens[idx] },
+                .bold = bold,
+            };
         },
     }
 }
@@ -724,46 +759,52 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
     
     switch (branch_type) {
         .trunk => {
-            if (dy == 0) {
-                result = "/~";
-            } else if (dx < 0) {
-                result = "\\|";
-            } else if (dx == 0) {
-                result = "/|\\";
-            } else if (dx > 0) {
-                result = "|/";
-            } else {
-                result = "?";
+            if (dy < 0) { // Going up
+                if (dx < 0) { // Up and left
+                    result = if (self.dice.rollI64(2) == 0) "/|" else "\\|";
+                } else if (dx == 0) { // Straight up
+                    const choices = [_][]const u8{ "|", "│", "║", "/|\\", "/|", "|\\", "|" };
+                    const idx = self.dice.rollUsize(choices.len);
+                    result = choices[idx];
+                } else { // Up and right
+                    result = if (self.dice.rollI64(2) == 0) "|/" else "|\\";
+                }
+            } else if (dy == 0) { // Horizontal
+                if (dx < 0) { // Left
+                    result = "/~";
+                } else if (dx == 0) { // No movement
+                    result = "/~\\";
+                } else { // Right
+                    result = "~\\";
+                }
+            } else { // Going down (rare for trunk)
+                result = "|";
             }
         },
         .shootLeft => {
-            if (dy > 0) {
+            if (dy < 0) { // Up and left
+                const choices = [_][]const u8{ "/", "\\|", "\\" };
+                const idx = self.dice.rollUsize(choices.len);
+                result = choices[idx];
+            } else if (dy == 0) { // Horizontal left
+                const choices = [_][]const u8{ "\\_", "\\", "\\~" };
+                const idx = self.dice.rollUsize(choices.len);
+                result = choices[idx];
+            } else { // Down and left
                 result = "\\";
-            } else if (dy == 0) {
-                result = "\\_";
-            } else if (dx < 0) {
-                result = "\\|";
-            } else if (dx == 0) {
-                result = "/|";
-            } else if (dx > 0) {
-                result = "/";
-            } else {
-                result = "?";
             }
         },
         .shootRight => {
-            if (dy > 0) {
+            if (dy < 0) { // Up and right
+                const choices = [_][]const u8{ "\\", "|/", "/" };
+                const idx = self.dice.rollUsize(choices.len);
+                result = choices[idx];
+            } else if (dy == 0) { // Horizontal right
+                const choices = [_][]const u8{ "_/", "/", "~/" };
+                const idx = self.dice.rollUsize(choices.len);
+                result = choices[idx];
+            } else { // Down and right
                 result = "/";
-            } else if (dy == 0) {
-                result = "_/";
-            } else if (dx < 0) {
-                result = "\\|";
-            } else if (dx == 0) {
-                result = "/|";
-            } else if (dx > 0) {
-                result = "/";
-            } else {
-                result = "?";
             }
         },
         .dying, .dead => {
