@@ -24,18 +24,6 @@ pub const BranchType = enum {
     dead,
 };
 
-/// Set the default panic handler to the vaxis panic_handler. This will clean up the terminal if any
-/// panics occur
-pub const panic = vaxis.panic_handler;
-
-/// Set some scope levels for the vaxis scopes
-pub const std_options: std.Options = .{
-    .log_scope_levels = &.{
-        .{ .scope = .vaxis, .level = .warn },
-        .{ .scope = .vaxis_parser, .level = .warn },
-    },
-};
-
 /// Used to count tree properties
 const Counters = struct {
     branches: usize = 0,
