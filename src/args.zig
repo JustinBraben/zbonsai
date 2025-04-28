@@ -117,7 +117,7 @@ pub fn parse_args(ally: Allocator) !Args {
 
     // Write help if -h was passed
     if (res.args.help != 0) {
-        try clap.help(std.io.getStdErr().writer(), clap.Help, &params, .{});
+        try clap.help(io.getStdErr().writer(), clap.Help, &params, .{});
     }
 
     var multiplier: usize = 5;
@@ -194,7 +194,7 @@ pub fn parse_args(ally: Allocator) !Args {
         .timeStep = timeStep,
 
         .message = message,
-        .leaves = std.mem.zeroes([64]u8),
+        .leaves = @splat(0),
 
         .save = save,
         .load = load,

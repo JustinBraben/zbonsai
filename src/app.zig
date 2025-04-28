@@ -5,7 +5,6 @@ const Allocator = mem.Allocator;
 const debug = std.debug;
 const print = debug.print;
 const io = std.io;
-const builtin = std.builtin;
 
 const Args = @import("args.zig");
 const BaseType = Args.BaseType;
@@ -13,7 +12,6 @@ const Styles = @import("styles.zig");
 const Dice = @import("dice.zig");
 
 const vaxis = @import("vaxis");
-const gwidth = vaxis.gwidth.gwidth;
 const clap = @import("clap");
 
 pub const BranchType = enum {
@@ -85,7 +83,7 @@ pub fn run(self: *App) !void {
     try self.vx.enterAltScreen(self.tty.anyWriter());
     try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
 
-    var myCounters = std.mem.zeroes(Counters);
+    var myCounters: Counters = .{};
 
     var pass_finished = false;
 
