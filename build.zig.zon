@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.14.0",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis#6a07aa7e3745d32af79c6cd86f4871910b5e6060",
-            .hash = "vaxis-0.1.0-BWNV_MkMCQC5L6gqogtruEXEgj4jyZjpvqHzJ_44-UA7",
+            .url = "git+https://github.com/rockorager/libvaxis#84d6cb381c0d628550fac3f6daa24c5faf7b2cd1",
+            .hash = "vaxis-0.1.0-BWNV_O8OCQBC4w-MnOGaKw9zFVFgTxf3XfcvgScUagEJ",
         },
         .clap = .{
             .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.10.0.tar.gz",
