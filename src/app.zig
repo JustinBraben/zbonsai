@@ -38,10 +38,12 @@ const Event = union(enum) {
     winsize: vaxis.Winsize,
 };
 
+var branch_string_buffer: [256]u8 = undefined;
+
 const App = @This();
 
 allocator: Allocator,
-arena: std.heap.ArenaAllocator,
+branch_string_fba: std.heap.FixedBufferAllocator,
 /// A flag for if we should quit
 should_quit: bool,
 /// The tty we are talking to
@@ -57,7 +59,7 @@ args: Args,
 pub fn init(allocator: Allocator, args: Args) !App {
     return .{
         .allocator = allocator,
-        .arena = std.heap.ArenaAllocator.init(allocator),
+        .branch_string_fba = std.heap.FixedBufferAllocator.init(&branch_string_buffer),
         .should_quit = false,
         .tty = try vaxis.Tty.init(),
         .vx = try vaxis.init(allocator, .{}),
@@ -70,6 +72,7 @@ pub fn init(allocator: Allocator, args: Args) !App {
 pub fn deinit(self: *App) void {
     self.vx.deinit(self.allocator, self.tty.anyWriter());
     self.tty.deinit();
+    self.branch_string_fba.reset();
 }
 
 pub fn run(self: *App) !void {
@@ -687,7 +690,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
 }
 
 /// Return vaxis style for color of tree parts
-fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
+inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     switch (branch_type) {
         .trunk => {
             // Brown colors for trunk with varied intensity
@@ -799,8 +802,9 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
         },
     }
     
-    // Create a durable copy in the arena
-    return try self.arena.allocator().dupe(u8, result);
+    // Create a durable copy fba
+    self.branch_string_fba.reset();
+    return try self.branch_string_fba.allocator().dupe(u8, result);
 }
 
 /// Get Max Y bounds for the tree, based on baseType
