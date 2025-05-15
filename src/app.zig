@@ -687,6 +687,20 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             returnDx.* = 0;
         }
     }
+
+    if (returnDx.* > 1) {
+        returnDx.* = 1;
+    }
+    else if (returnDx.* < -1) {
+        returnDx.* = -1;
+    }
+
+    if (returnDy.* > 1) {
+        returnDy.* = 1;
+    }
+    else if (returnDy.* < -1) {
+        returnDy.* = -1;
+    }
 }
 
 /// Return vaxis style for color of tree parts
