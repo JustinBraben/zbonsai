@@ -2,10 +2,6 @@
 const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
-const debug = std.debug;
-const print = debug.print;
-const io = std.io;
-const builtin = std.builtin;
 
 const Args = @import("args.zig");
 const App = @import("app.zig");

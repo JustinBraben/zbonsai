@@ -2,8 +2,6 @@
 const std = @import("std");
 const mem = std.mem;
 const Allocator = mem.Allocator;
-const debug = std.debug;
-const print = debug.print;
 const io = std.io;
 
 const Args = @import("args.zig");
@@ -857,7 +855,7 @@ fn loadFromFile(args: *Args) !void {
     defer file.close();
 
     // Read from file using a buffered reader
-    var buf_reader = std.io.bufferedReader(file.reader());
+    var buf_reader = io.bufferedReader(file.reader());
     const reader = buf_reader.reader();
 
     // Read values from file
