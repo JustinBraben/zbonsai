@@ -36,12 +36,9 @@ const Event = union(enum) {
     winsize: vaxis.Winsize,
 };
 
-var branch_string_buffer: [256]u8 = undefined;
-
 const App = @This();
 
 allocator: Allocator,
-branch_string_fba: std.heap.FixedBufferAllocator,
 /// A flag for if we should quit
 should_quit: bool,
 /// The tty we are talking to
@@ -57,7 +54,6 @@ args: Args,
 pub fn init(allocator: Allocator, args: Args) !App {
     return .{
         .allocator = allocator,
-        .branch_string_fba = std.heap.FixedBufferAllocator.init(&branch_string_buffer),
         .should_quit = false,
         .tty = try vaxis.Tty.init(),
         .vx = try vaxis.init(allocator, .{}),
@@ -70,7 +66,6 @@ pub fn init(allocator: Allocator, args: Args) !App {
 pub fn deinit(self: *App) void {
     self.vx.deinit(self.allocator, self.tty.anyWriter());
     self.tty.deinit();
-    self.branch_string_fba.reset();
 }
 
 pub fn run(self: *App) !void {
@@ -756,67 +751,63 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
     var branch_type = branch_type_input;
     if (life < 4) branch_type = .dying;
 
-    var result: []const u8 = undefined;
-    
     switch (branch_type) {
         .trunk => {
             if (dy < 0) { // Going up
                 if (dx < 0) { // Up and left
-                    result = if (self.dice.rollI64(2) == 0) "/|" else "\\|";
+                    return if (self.dice.rollI64(2) == 0) "/|" else "\\|";
                 } else if (dx == 0) { // Straight up
                     const choices = [_][]const u8{ "|", "│", "║", "/|\\", "/|", "|\\", "|" };
                     const idx = self.dice.rollUsize(choices.len);
-                    result = choices[idx];
+                    return choices[idx];
                 } else { // Up and right
-                    result = if (self.dice.rollI64(2) == 0) "|/" else "|\\";
+                    return if (self.dice.rollI64(2) == 0) "|/" else "|\\";
                 }
             } else if (dy == 0) { // Horizontal
                 if (dx < 0) { // Left
-                    result = "/~";
+                    return "/~";
                 } else if (dx == 0) { // No movement
-                    result = "/~\\";
+                    return "/~\\";
                 } else { // Right
-                    result = "~\\";
+                    return "~\\";
                 }
             } else { // Going down (rare for trunk)
-                result = "|";
+                return "|";
             }
         },
         .shootLeft => {
             if (dy < 0) { // Up and left
                 const choices = [_][]const u8{ "/", "\\|", "\\" };
                 const idx = self.dice.rollUsize(choices.len);
-                result = choices[idx];
+                return choices[idx];
             } else if (dy == 0) { // Horizontal left
                 const choices = [_][]const u8{ "\\_", "\\", "\\~" };
                 const idx = self.dice.rollUsize(choices.len);
-                result = choices[idx];
+                return choices[idx];
             } else { // Down and left
-                result = "\\";
+                return "\\";
             }
         },
         .shootRight => {
             if (dy < 0) { // Up and right
                 const choices = [_][]const u8{ "\\", "|/", "/" };
                 const idx = self.dice.rollUsize(choices.len);
-                result = choices[idx];
+                return choices[idx];
             } else if (dy == 0) { // Horizontal right
                 const choices = [_][]const u8{ "_/", "/", "~/" };
                 const idx = self.dice.rollUsize(choices.len);
-                result = choices[idx];
+                return choices[idx];
             } else { // Down and right
-                result = "/";
+                return "/";
             }
         },
         .dying, .dead => {
-            const rand_index = self.dice.rollUsize(self.args.leaves.len);
-            result = self.args.leaves[0..rand_index];
+            // For leaves, we need to handle the substring differently
+            // Since leaves might be a substring, we need a more careful approach
+            const rand_index = self.dice.rollUsize(self.args.leaves.len) + 1; // +1 because we want at least 1 character
+            return self.args.leaves[0..rand_index];
         },
     }
-    
-    // Create a durable copy fba
-    self.branch_string_fba.reset();
-    return try self.branch_string_fba.allocator().dupe(u8, result);
 }
 
 /// Get Max Y bounds for the tree, based on baseType
