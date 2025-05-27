@@ -107,9 +107,7 @@ pub fn run(self: *App) !void {
             self.should_quit = true;
         }
         else {
-            var buffered = self.tty.bufferedWriter();
-            try self.vx.render(buffered.writer().any());
-            try buffered.flush();
+            try self.renderScreen();
         }
     }
 
@@ -141,14 +139,18 @@ pub fn update(self: *App, event: Event) !void {
     }
 }
 
+// Update screen for live view
 pub fn updateScreen(self: *App, timeStep: f32) !void {
-    var buffered = self.tty.bufferedWriter();
-    // Render the application to the screen
-    try self.vx.render(buffered.writer().any());
-    try buffered.flush();
-
+    try self.renderScreen();
     const ms: u64 = @intFromFloat(timeStep * std.time.ms_per_s);
     std.time.sleep(ms * std.time.ns_per_ms);
+}
+
+// Render the application to the screen
+pub fn renderScreen(self: *App) !void {
+    var buffered = self.tty.bufferedWriter();
+    try self.vx.render(buffered.writer().any());
+    try buffered.flush();
 }
 
 /// For debugging, used to view args values in the terminal window
