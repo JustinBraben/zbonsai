@@ -472,7 +472,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
             const buf = buffer[0..];
 
             const msg = try std.fmt.bufPrint(buf, 
-            \\maxX: {d}, maxY: {d}
+                \\maxX: {d}, maxY: {d}
                 \\
                 \\dx: {d}
                 \\dy: {d}
