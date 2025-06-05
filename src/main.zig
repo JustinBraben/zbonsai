@@ -37,6 +37,7 @@ pub fn main() !void {
 }
 
 test "Main - run all tests" {
+    _ = @import("app.zig");
     _ = @import("args.zig");
     _ = @import("dice.zig");
 }

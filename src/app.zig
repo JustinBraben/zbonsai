@@ -1,5 +1,6 @@
 //! app.zig
 const std = @import("std");
+const testing = std.testing;
 const mem = std.mem;
 const Allocator = mem.Allocator;
 const io = std.io;
@@ -863,4 +864,25 @@ fn loadFromFile(args: *Args) !void {
     
     args.*.seed = try std.fmt.parseInt(i32, seedStr, 10);
     args.*.targetBranchCount = try std.fmt.parseInt(i32, branchCountStr, 10);
+}
+
+test "App - setDeltas produces valid delta values" {
+    const test_alloc = std.testing.allocator;
+    var empty_args = try Args.parse_args(test_alloc);
+    defer empty_args.deinit();
+
+    var app = try App.init(test_alloc, empty_args);
+    defer app.deinit();
+    
+    var dx: i64 = 0;
+    var dy: i64 = 0;
+    
+    // Test trunk deltas
+    app.setDeltas(.trunk, 10, 5, 3, &dx, &dy);
+    try testing.expect(dx >= -1 and dx <= 1);
+    try testing.expect(dy >= -1 and dy <= 1);
+    
+    // Test that dying branches have wider spread
+    app.setDeltas(.dying, 2, 8, 3, &dx, &dy);
+    try testing.expect(dx >= -3 and dx <= 3);
 }
