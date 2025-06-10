@@ -17,17 +17,21 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const exe = b.addExecutable(.{
-        .name = "zbonsai",
+    const exe_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
+    const exe = b.addExecutable(.{
+        .name = "zbonsai",
+        .root_module = exe_mod,
+    });
+
     // To use the C allocator
     exe.linkLibC();
-    exe.root_module.addImport("clap", clap.module("clap"));
-    exe.root_module.addImport("vaxis", vaxis.module("vaxis"));
+    exe_mod.addImport("clap", clap.module("clap"));
+    exe_mod.addImport("vaxis", vaxis.module("vaxis"));
 
     b.installArtifact(exe);
 

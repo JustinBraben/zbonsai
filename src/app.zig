@@ -886,3 +886,17 @@ test "App - setDeltas produces valid delta values" {
     app.setDeltas(.dying, 2, 8, 3, &dx, &dy);
     try testing.expect(dx >= -3 and dx <= 3);
 }
+
+test "App - no memory leaks in tree generation" {
+    const allocator = std.testing.allocator;
+    var empty_args = try Args.parse_args(allocator);
+    defer empty_args.deinit();
+    
+    var app = try App.init(allocator, empty_args);
+    defer app.deinit();
+    
+    var counters = Counters{};
+    try app.growTree(&counters);
+    
+    // std.testing.allocator will detect leaks automatically
+}
