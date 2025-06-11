@@ -51,6 +51,7 @@ loop: vaxis.Loop(Event),
 dice: Dice,
 /// Arguments passed in from command line
 args: Args,
+debug_buffer: [512]u8 = undefined,
 
 pub fn init(allocator: Allocator, args: Args) !App {
     return .{
@@ -87,7 +88,8 @@ pub fn run(self: *App) !void {
     while (!self.should_quit) {
         // pollEvent blocks until we have an event
         self.loop.pollEvent();
-        // tryEvent returns events until the queue is empty
+        // tryEvent returns events if one is available
+        // does not block
         while (self.loop.tryEvent()) |event| {
             try self.update(event);
         }
@@ -157,10 +159,8 @@ pub fn renderScreen(self: *App) !void {
 /// For debugging, used to view args values in the terminal window
 pub fn drawConfig(self: *App) !void {
     const win = self.vx.window();
-    var buffer: [300]u8 = undefined;
-    const buf = buffer[0..];
 
-    const msg = try std.fmt.bufPrint(buf,
+    const msg = try std.fmt.bufPrint(&self.debug_buffer,
         \\live: {}
         \\infinite: {}
         \\screensaver: {}
@@ -469,10 +469,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         const win = self.vx.window();
 
         if (self.args.verbosity != .none) {
-            var buffer: [300]u8 = undefined;
-            const buf = buffer[0..];
-
-            const msg = try std.fmt.bufPrint(buf, 
+            const msg = try std.fmt.bufPrint(&self.debug_buffer, 
                 \\maxX: {d}, maxY: {d}
                 \\
                 \\dx: {d}
