@@ -4,14 +4,12 @@
         {
             "label": "build",
             "type": "shell",
-            "command": "zig build",
-            "group": "build",
-            "problemMatcher": [ 
-                "$gcc"
+            "command": "zig",
+            "args": [
+                "build",
             ],
-            "presentation": {
-                "clear": true
-            }
+            "problemMatcher": [],
+            "group": "build"
         }
     ]
 }

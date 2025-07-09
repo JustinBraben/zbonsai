@@ -5,14 +5,43 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
+            "name": "launch (Debug)",
+            "type": "cppdbg",
             "request": "launch",
-            "name": "(Unix) Debug",
-            "program": "${workspaceFolder}/zig-out/bin/new-bonsai",
-            "console": "integratedTerminal",
+            "program": "${workspaceFolder}/zig-out/bin/zbonsai",
             "args": [],
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
+            "environment": [],
             "preLaunchTask": "build",
-        }
+            "osx": {
+                "MIMode": "lldb"
+            },
+            "windows": {
+                "type": "cppvsdbg",
+                "console": "integratedTerminal"
+            }
+        },
+        {
+            "name": "run with print (Debug)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/zig-out/bin/zbonsai",
+            "args": [
+                "run",
+                "-p"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "preLaunchTask": "build",
+            "osx": {
+                "MIMode": "lldb"
+            },
+            "windows": {
+                "type": "cppvsdbg",
+                "console": "integratedTerminal"
+            }
+        },
     ]
 }
