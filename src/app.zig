@@ -52,6 +52,7 @@ dice: Dice,
 /// Arguments passed in from command line
 args: Args,
 debug_buffer: [512]u8 = undefined,
+initial_resize_handled: bool = false,
 
 pub fn init(allocator: Allocator, args: Args) !App {
     return .{
@@ -91,7 +92,7 @@ pub fn run(self: *App) !void {
         // tryEvent returns events if one is available
         // does not block
         while (self.loop.tryEvent()) |event| {
-            try self.update(event);
+            try self.update(event, &myCounters, &pass_finished);
         }
 
         // Resets window, draws the base of the tree
@@ -122,7 +123,7 @@ pub fn run(self: *App) !void {
 }
 
 /// Update our application state from an event
-pub fn update(self: *App, event: Event) !void {
+pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *bool) !void {
     switch (event) {
         .key_press => |key| {
             if (key.matches('c', .{ .ctrl = true })) {
@@ -131,12 +132,18 @@ pub fn update(self: *App, event: Event) !void {
         },
         .winsize => |ws| {
             try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
-            const win = self.vx.window();
-            const center = vaxis.widgets.alignment.center(win, 50, 3);
-            _ = center.printSegment(.{ .text = 
-            \\Oops, resize needs to be implemented still...
-            \\Press Ctrl+C to exit the program and run again
-            }, .{});
+            // Only redraw if this isn't the initial resize
+            if (self.initial_resize_handled) {
+                const win = self.vx.window();
+                win.clear();
+                try self.drawWins();
+                try self.drawMessage();
+                myCounters.* = .{}; // Reset counters
+                try self.growTree(myCounters);
+                pass_finished.* = true; // Mark as finished to avoid duplicate drawing
+            } else {
+                self.initial_resize_handled = true;
+            }
         },
         else => {},
     }
@@ -802,9 +809,11 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
             }
         },
         .dying, .dead => {
-            // For leaves, we need to handle the substring differently
-            // Since leaves might be a substring, we need a more careful approach
-            const rand_index = self.dice.rollUsize(self.args.leaves.len) + 1; // +1 because we want at least 1 character
+            // fallback
+            if (self.args.leaves.len == 0) return "&";
+            // reasonable max for leaves
+            const max_len = @min(self.args.leaves.len, 3);
+            const rand_index = self.dice.rollUsize(max_len) + 1;
             return self.args.leaves[0..rand_index];
         },
     }
@@ -862,40 +871,3 @@ fn loadFromFile(args: *Args) !void {
     args.*.seed = try std.fmt.parseInt(i32, seedStr, 10);
     args.*.targetBranchCount = try std.fmt.parseInt(i32, branchCountStr, 10);
 }
-// TODO: fix
-// Commenting to see why macos tests are failing in CI
-// Likely app.init is failing somewhere
-// test "App - setDeltas produces valid delta values" {
-//     const test_alloc = std.testing.allocator;
-//     var empty_args = try Args.parse_args(test_alloc);
-//     defer empty_args.deinit();
-
-//     var app = try App.init(test_alloc, empty_args);
-//     defer app.deinit();
-    
-//     var dx: i64 = 0;
-//     var dy: i64 = 0;
-    
-//     // Test trunk deltas
-//     app.setDeltas(.trunk, 10, 5, 3, &dx, &dy);
-//     try testing.expect(dx >= -1 and dx <= 1);
-//     try testing.expect(dy >= -1 and dy <= 1);
-    
-//     // Test that dying branches have wider spread
-//     app.setDeltas(.dying, 2, 8, 3, &dx, &dy);
-//     try testing.expect(dx >= -3 and dx <= 3);
-// }
-
-// test "App - no memory leaks in tree generation" {
-//     const allocator = std.testing.allocator;
-//     var empty_args = try Args.parse_args(allocator);
-//     defer empty_args.deinit();
-    
-//     var app = try App.init(allocator, empty_args);
-//     defer app.deinit();
-    
-//     var counters = Counters{};
-//     try app.growTree(&counters);
-    
-//     // std.testing.allocator will detect leaks automatically
-// }
