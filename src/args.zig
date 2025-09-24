@@ -103,7 +103,7 @@ pub fn parse_args(ally: Allocator) !Args {
         .diagnostic = &diag,
         .allocator = ally,
     }) catch |err| {
-        diag.report(io.getStdErr().writer(), err) catch {};
+         try diag.reportToFile(.stderr(), err);
         return err;
     };
     defer res.deinit();
@@ -117,7 +117,7 @@ pub fn parse_args(ally: Allocator) !Args {
 
     // Write help if -h was passed
     if (res.args.help != 0) {
-        try clap.help(io.getStdErr().writer(), clap.Help, &params, .{});
+        try clap.helpToFile(.stderr(), clap.Help, &params, .{});
     }
 
     var multiplier: usize = 5;

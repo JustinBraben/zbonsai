@@ -29,7 +29,8 @@ pub fn main() !void {
     }
 
     // Initialize our application
-    var app = try App.init(allocator, args);
+    var buffer: [1024]u8 = undefined;
+    var app = try App.init(allocator, args, &buffer);
     defer app.deinit();
 
     // Run the application

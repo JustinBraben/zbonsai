@@ -54,11 +54,11 @@ args: Args,
 debug_buffer: [512]u8 = undefined,
 initial_resize_handled: bool = false,
 
-pub fn init(allocator: Allocator, args: Args) !App {
+pub fn init(allocator: Allocator, args: Args, buffer: []u8) !App {
     return .{
         .allocator = allocator,
         .should_quit = false,
-        .tty = try vaxis.Tty.init(),
+        .tty = try vaxis.Tty.init(buffer),
         .vx = try vaxis.init(allocator, .{}),
         .loop = undefined,
         .dice = Dice.init(args.seed),
@@ -153,14 +153,13 @@ pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *b
 pub fn updateScreen(self: *App, timeStep: f32) !void {
     try self.renderScreen();
     const ms: u64 = @intFromFloat(timeStep * std.time.ms_per_s);
-    std.time.sleep(ms * std.time.ns_per_ms);
+    std.Thread.sleep(ms * std.time.ns_per_ms);
 }
 
 // Render the application to the screen
 pub fn renderScreen(self: *App) !void {
-    var buffered = self.tty.bufferedWriter();
-    try self.vx.render(buffered.writer().any());
-    try buffered.flush();
+    try self.vx.render(self.tty.anyWriter());
+    try self.tty.anyWriter().flush();
 }
 
 /// For debugging, used to view args values in the terminal window

@@ -2,15 +2,15 @@
     .name = .zbonsai,
     .fingerprint = 0x4eeccbf5d6ffbaed,
     .version = "0.1.0",
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis.git#de4f564ba281e9ed4df65834d00727d88f56632b",
-            .hash = "vaxis-0.5.1-BWNV_JIWCQAoX8lZ-5eLf-sFzA-h7aXvNNEenyC2b83s",
+            .url = "git+https://github.com/rockorager/libvaxis.git#ec8e7bd481098472a4f6ae850894328d0632e343",
+            .hash = "vaxis-0.5.1-BWNV_NAXCQBfhj7096k0ejbvSUOmQ21UuvIab9lr5xPE",
         },
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.10.0.tar.gz",
-            .hash = "clap-0.10.0-oBajB434AQBDh-Ei3YtoKIRxZacVPF1iSwp3IX_ZB8f0",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.11.0.tar.gz",
+            .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
         },
     },
     .paths = .{
