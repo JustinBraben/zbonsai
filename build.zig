@@ -46,10 +46,10 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     const unit_tests = b.addTest(.{
         .root_module = exe_mod,
-        .test_runner = .{ 
-            .path = b.path("test/test_runner.zig"),
-            .mode = .simple,
-        },
+        // .test_runner = .{ 
+        //     .path = b.path("test/test_runner.zig"),
+        //     .mode = .simple,
+        // },
     });
     unit_tests.linkLibC();
     unit_tests.root_module.addImport("clap", clap.module("clap"));

@@ -70,15 +70,26 @@ const Test = struct {
 
     fn formatStackTrace(self: *Test, maybe_trace: ?*std.builtin.StackTrace) !?[]const u8 {
         return if (maybe_trace) |trace| blk: {
-            var stream = std.io.fixedBufferStream(&self.stack_trace_buf);
-            const writer = stream.writer();
-            try trace.format("", .{}, writer);
-            break :blk stream.getWritten();
+            // var stream = std.io.fixedBufferStream(&self.stack_trace_buf);
+            // const writer = stream.writer();
+            // try trace.format("", .{}, writer);
+            // break :blk stream.getWritten();
+
+            const stdout_file = std.fs.File.stdout();
+            var writer = stdout_file.writer(&self.stack_trace_buf);
+            const writer_interface: *std.io.Writer = &writer.interface;
+            try trace.format(writer_interface);
+            break :blk writer_interface.buffered();
         } else null;
     }
 
-    pub fn print(self: Test, stream: anytype) !void {
-        const writer = stream.writer();
+    pub fn print(self: Test, writer: *std.io.Writer) !void {
+        // const writer = stream.writer();
+
+        // const stdout_file = std.fs.File.stdout();
+        // var writer = stdout_file.writer(&self.stack_trace_buf);
+        // const writer_interface: *std.io.Writer = &writer.interface;
+        // try trace.format(writer_interface);
 
         // Format test name like "module::name"
         const full_name = if (self.module) |module|
@@ -105,7 +116,7 @@ const Test = struct {
         try writer.writeByte('\n');
     }
 
-    fn printFailureDetail(self: Test, failure: Failure, writer: anytype) !void {
+    fn printFailureDetail(self: Test, failure: Failure, writer: *std.io.Writer) !void {
         try writer.print("\nfailures:\n\n", .{});
         
         // Format similar to Rust's failure output
@@ -129,8 +140,8 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    var tests = std.ArrayList(Test).init(allocator);
-    defer tests.deinit();
+    var tests: std.ArrayList(Test) = .empty;
+    defer tests.deinit(allocator);
 
     // Parse command line arguments
     const args = try std.process.argsAlloc(allocator);
@@ -148,27 +159,30 @@ pub fn main() !void {
 
     // Get built-in tests
     const test_fns = builtin.test_functions;
-    try tests.ensureTotalCapacity(test_fns.len);
+    try tests.ensureTotalCapacity(allocator, test_fns.len);
     
     for (test_fns) |test_fn| {
-        try tests.append(Test.init(test_fn));
+        try tests.append(allocator, Test.init(test_fn));
     }
 
-    const stderr = std.io.getStdErr().writer();
+    const stderr_file = std.fs.File.stderr();
+    var buf: [1024]u8 = undefined;
+    var stderr_writer = stderr_file.writer(&buf);
+    const stderr_writer_interface: *std.io.Writer = &stderr_writer.interface;
 
     // Print Rust-like header
-    try stderr.print("\nrunning {d} tests\n", .{tests.items.len});
+    try stderr_writer_interface.print("\nrunning {d} tests\n", .{tests.items.len});
 
     // Run and print tests in Rust style
     for (tests.items) |*current_test| {
         try current_test.run(allocator, run_ignored);
-        try current_test.print(std.io.getStdErr());
+        try current_test.print(&stderr_writer.interface);
     }
 
-    try printSummary(tests.items, start);
+    try printSummary(tests.items, start, stderr_writer_interface);
 }
 
-fn printSummary(tests: []const Test, start: i128) !void {
+fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.io.Writer) !void {
     var success: usize = 0;
     var failure: usize = 0;
     var leaked: usize = 0;
@@ -183,7 +197,7 @@ fn printSummary(tests: []const Test, start: i128) !void {
         if (t.leaked) leaked += 1;
     }
     
-    const writer = std.io.getStdErr().writer();
+    // const writer = std.io.getStdErr().writer();
     var total_duration_buf: [256]u8 = undefined;
     const total_duration = try duration(
         &total_duration_buf,
@@ -198,13 +212,13 @@ fn printSummary(tests: []const Test, start: i128) !void {
             .success, .skipped => {},
             .failure => |capture| {
                 if (!has_failures) has_failures = true;
-                try t.printFailureDetail(capture, writer);
+                try t.printFailureDetail(capture, stderr_writer_interface);
             },
         }
     }
     
     if (has_failures) {
-        try writer.print("\nfailures:\n", .{});
+        try stderr_writer_interface.print("\nfailures:\n", .{});
         for (tests) |t| {
             if (t.result == .failure) {
                 const full_name = if (t.module) |module|
@@ -213,25 +227,25 @@ fn printSummary(tests: []const Test, start: i128) !void {
                     t.name;
                 defer if (t.module != null) std.heap.page_allocator.free(full_name);
                 
-                try writer.print("    {s}\n", .{full_name});
+                try stderr_writer_interface.print("    {s}\n", .{full_name});
             }
         }
     }
 
     // Print Rust-like summary line
-    try writer.print("\ntest result: ", .{});
+    try stderr_writer_interface.print("\ntest result: ", .{});
     
     if (failure == 0 and leaked == 0) {
-        try writer.print("{s}. ", .{green("ok")});
+        try stderr_writer_interface.print("{s}. ", .{green("ok")});
     } else {
-        try writer.print("{s}. ", .{red("FAILED")});
+        try stderr_writer_interface.print("{s}. ", .{red("FAILED")});
     }
     
-    try writer.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", 
+    try stderr_writer_interface.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", 
         .{success, failure, skipped, total_duration});
 
     if (leaked > 0) {
-        try writer.print("\n{d} tests leaked memory\n", .{leaked});
+        try stderr_writer_interface.print("\n{d} tests leaked memory\n", .{leaked});
     }
 
     // TODO: Doc-tests section like in Rust
@@ -317,8 +331,8 @@ pub fn duration(buf: *[256]u8, delta: i64, is_colorized: bool) ![]const u8 {
     if (!is_colorized) {
         return try std.fmt.bufPrint(
             buf,
-            "{}",
-            .{std.fmt.fmtDurationSigned(delta)},
+            "{D}",
+            .{delta},
         );
     }
 
@@ -331,8 +345,8 @@ pub fn duration(buf: *[256]u8, delta: i64, is_colorized: bool) ![]const u8 {
     var duration_buf: [256]u8 = undefined;
     const formatted_duration = try std.fmt.bufPrint(
         &duration_buf,
-        "{}",
-        .{std.fmt.fmtDurationSigned(delta)},
+        "{D}",
+        .{delta},
     );
     return try colorize(color, buf, formatted_duration, true);
 }

@@ -98,12 +98,17 @@ pub fn parse_args(ally: Allocator) !Args {
         .VERBOSITY = clap.parsers.enumeration(Verbosity),
     };
 
+    // const stderr_file = std.fs.File.stderr();
+    // var buf: [1024]u8 = undefined;
+    // var stderr_writer = stderr_file.writer(&buf);
+    // const stderr_writer_interface: *std.io.Writer = &stderr_writer.interface;
+
     var diag = clap.Diagnostic{};
     var res = clap.parse(clap.Help, &params, parsers, .{
         .diagnostic = &diag,
         .allocator = ally,
     }) catch |err| {
-         try diag.reportToFile(.stderr(), err);
+         try diag.reportToFile(std.fs.File.stderr(), err);
         return err;
     };
     defer res.deinit();
