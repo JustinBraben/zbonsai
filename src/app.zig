@@ -67,7 +67,7 @@ pub fn init(allocator: Allocator, args: Args, buffer: []u8) !App {
 }
 
 pub fn deinit(self: *App) void {
-    self.vx.deinit(self.allocator, self.tty.anyWriter());
+    self.vx.deinit(self.allocator, self.tty.writer());
     self.tty.deinit();
 }
 
@@ -79,8 +79,8 @@ pub fn run(self: *App) !void {
     try self.loop.init();
     try self.loop.start();
 
-    try self.vx.enterAltScreen(self.tty.anyWriter());
-    try self.vx.queryTerminal(self.tty.anyWriter(), 1 * std.time.ns_per_s);
+    try self.vx.enterAltScreen(self.tty.writer());
+    try self.vx.queryTerminal(self.tty.writer(), 1 * std.time.ns_per_s);
 
     var myCounters: Counters = .{};
 
@@ -117,8 +117,8 @@ pub fn run(self: *App) !void {
 
     // If -p flag passed to program, print the tree to terminal after completion
     if (self.args.printTree) {
-        try self.vx.exitAltScreen(self.tty.anyWriter());
-        try self.vx.prettyPrint(self.tty.anyWriter());
+        try self.vx.exitAltScreen(self.tty.writer());
+        try self.vx.prettyPrint(self.tty.writer());
     }
 }
 
@@ -131,7 +131,7 @@ pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *b
             }
         },
         .winsize => |ws| {
-            try self.vx.resize(self.allocator, self.tty.anyWriter(), ws);
+            try self.vx.resize(self.allocator, self.tty.writer(), ws);
             // Only redraw if this isn't the initial resize
             if (self.initial_resize_handled) {
                 const win = self.vx.window();
@@ -158,8 +158,8 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
 
 // Render the application to the screen
 pub fn renderScreen(self: *App) !void {
-    try self.vx.render(self.tty.anyWriter());
-    try self.tty.anyWriter().flush();
+    try self.vx.render(self.tty.writer());
+    try self.tty.writer().flush();
 }
 
 /// For debugging, used to view args values in the terminal window
