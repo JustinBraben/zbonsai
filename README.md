@@ -15,7 +15,7 @@ Inspired by [cbonsai](https://gitlab.com/jallbrit/cbonsai), zbonsai is a Zig-bas
 
 ## Installation
 
-To install zbonsai, you'll need to have Zig `0.14.1` on your system. Then, follow these steps:
+To install zbonsai, you'll need to have Zig `0.15.1` on your system. Then, follow these steps:
 
 1. Clone the repository:
    ```
