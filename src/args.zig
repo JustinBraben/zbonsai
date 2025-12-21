@@ -256,6 +256,20 @@ pub fn parse_args(ally: Allocator) !Args {
         .loadFile = loadFile,
     };
 
+    // If load flag is set, try to load seed and branch count from file
+    if (args.load) {
+        if (loadFromFile(args.loadFile)) |loaded| {
+            args.seed = loaded.seed;
+            args.targetBranchCount = loaded.branchCount;
+        } else |err| {
+            // If file not found, just continue with defaults (first run)
+            // For other errors, we might want to warn but continue
+            if (err != error.SaveFileNotFound) {
+                std.debug.print("Warning: Could not load from {s}: {}\n", .{ args.loadFile, err });
+            }
+        }
+    }
+
     // Parse the leaves into individual strings
     try args.parseLeaves(leaves);
 
@@ -274,44 +288,98 @@ pub fn deinit(self: *Args) void {
     self.allocator.free(self.loadFile);
 }
 
+/// Creates platform-specific default cache path for save/load files
+/// - macOS: ~/Library/Application Support/zbonsai/zbonsai.dat
+/// - Linux: ~/.cache/zbonsai (XDG Base Directory spec)
+/// - Windows: %APPDATA%\zbonsai\zbonsai.dat
 fn createDefaultCachePath(ally: Allocator) ![]u8 {
-    const toAppend = "cbonsai";
-    const res = try ally.alloc(u8, toAppend.len);
-    @memcpy(res, toAppend);
-    return res;
+    if (builtin.os.tag == .windows) {
+        // Windows: Use APPDATA environment variable
+        if (std.posix.getenv("APPDATA")) |appdata| {
+            const path = try std.fs.path.join(ally, &.{ appdata, "zbonsai", "zbonsai.dat" });
+            return path;
+        }
+        // Fallback for Windows if APPDATA not set
+        return try ally.dupe(u8, "zbonsai.dat");
+    } else if (builtin.os.tag == .macos) {
+        // macOS: Use ~/Library/Application Support/zbonsai/
+        if (std.posix.getenv("HOME")) |home| {
+            const path = try std.fs.path.join(ally, &.{ home, "Library", "Application Support", "zbonsai", "zbonsai.dat" });
+            return path;
+        }
+        // Fallback
+        return try ally.dupe(u8, "zbonsai.dat");
+    } else {
+        // Linux/Unix: Follow XDG Base Directory Specification
+        // First try XDG_CACHE_HOME, then fall back to ~/.cache
+        if (std.posix.getenv("XDG_CACHE_HOME")) |cache_home| {
+            const path = try std.fs.path.join(ally, &.{ cache_home, "zbonsai" });
+            return path;
+        } else if (std.posix.getenv("HOME")) |home| {
+            const path = try std.fs.path.join(ally, &.{ home, ".cache", "zbonsai" });
+            return path;
+        }
+        // Final fallback
+        return try ally.dupe(u8, "zbonsai");
+    }
 }
 
-// TODO: implement saveToFile
-fn saveToFile(ally: Allocator, file_name: []const u8, seed: u64, branchCount: u64) !void {
-    const file = try std.fs.cwd().createFile(file_name, .{ .read = true });
+/// Ensures the parent directory of a file path exists, creating it if necessary
+fn ensureParentDirExists(file_path: []const u8) !void {
+    if (std.fs.path.dirname(file_path)) |dir| {
+        std.fs.cwd().makePath(dir) catch |err| {
+            if (err != error.PathAlreadyExists) {
+                return err;
+            }
+        };
+    }
+}
+
+/// Save tree state (seed and branch count) to file
+/// Creates parent directories if they don't exist
+pub fn saveToFile(ally: Allocator, file_path: []const u8, seed: u64, branchCount: usize) !void {
+    // Ensure the directory exists
+    try ensureParentDirExists(file_path);
+
+    const file = try std.fs.cwd().createFile(file_path, .{});
     defer file.close();
 
     const content = try std.fmt.allocPrint(ally, "{d} {d}", .{ seed, branchCount });
     defer ally.free(content);
 
-    _ = try file.writeAll(content);
+    try file.writeAll(content);
 }
 
-// TODO: implement loadFromFile
-fn loadFromFile(self: *Args, file_name: []const u8) !void {
-    const file = try std.fs.cwd().openFile(file_name, .{});
+/// Load tree state (seed and branch count) from file
+/// Returns error if file doesn't exist or has invalid format
+pub fn loadFromFile(file_path: []const u8) !struct { seed: u64, branchCount: usize } {
+    const file = std.fs.cwd().openFile(file_path, .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            return error.SaveFileNotFound;
+        }
+        return err;
+    };
     defer file.close();
 
     var buffer: [100]u8 = undefined;
-    try file.seekTo(0);
     const bytes_read = try file.readAll(&buffer);
 
     if (bytes_read == 0) {
         return error.EmptyFile;
     }
 
-    var tokens = std.mem.tokenizeScalar(u8, buffer[0..bytes_read], ' ');
+    // Trim any trailing whitespace/newlines
+    const content = std.mem.trimRight(u8, buffer[0..bytes_read], " \t\n\r");
+
+    var tokens = std.mem.tokenizeScalar(u8, content, ' ');
 
     const seed_str = tokens.next() orelse return error.InvalidFileFormat;
     const branch_count_str = tokens.next() orelse return error.InvalidFileFormat;
 
-    self.seed = try std.fmt.parseInt(u64, seed_str, 10);
-    self.targetBranchCount = try std.fmt.parseInt(usize, branch_count_str, 10);
+    return .{
+        .seed = try std.fmt.parseInt(u64, seed_str, 10),
+        .branchCount = try std.fmt.parseInt(usize, branch_count_str, 10),
+    };
 }
 
 // ============================================================================
@@ -504,4 +572,57 @@ test "saveToFile functionality" {
 
     // Clean up test file
     try std.fs.cwd().deleteFile(test_file);
+}
+
+test "loadFromFile functionality" {
+    const test_alloc = std.testing.allocator;
+    const test_file = "test_load.dat";
+
+    // First save a file
+    try saveToFile(test_alloc, test_file, 99999, 42);
+
+    // Now load it back
+    const loaded = try loadFromFile(test_file);
+
+    try std.testing.expectEqual(@as(u64, 99999), loaded.seed);
+    try std.testing.expectEqual(@as(usize, 42), loaded.branchCount);
+
+    // Clean up test file
+    try std.fs.cwd().deleteFile(test_file);
+}
+
+test "loadFromFile - file not found returns error" {
+    const result = loadFromFile("nonexistent_file_12345.dat");
+    try std.testing.expectError(error.SaveFileNotFound, result);
+}
+
+test "saveToFile creates parent directories" {
+    const test_alloc = std.testing.allocator;
+    const test_file = "test_subdir/nested/test_save.dat";
+
+    // This should create the directories and the file
+    try saveToFile(test_alloc, test_file, 11111, 22);
+
+    // Verify it worked by loading
+    const loaded = try loadFromFile(test_file);
+    try std.testing.expectEqual(@as(u64, 11111), loaded.seed);
+    try std.testing.expectEqual(@as(usize, 22), loaded.branchCount);
+
+    // Clean up
+    try std.fs.cwd().deleteFile(test_file);
+    std.fs.cwd().deleteDir("test_subdir/nested") catch {};
+    std.fs.cwd().deleteDir("test_subdir") catch {};
+}
+
+test "createDefaultCachePath returns valid path" {
+    const test_alloc = std.testing.allocator;
+
+    const path = try createDefaultCachePath(test_alloc);
+    defer test_alloc.free(path);
+
+    // Path should not be empty
+    try std.testing.expect(path.len > 0);
+
+    // Path should contain 'zbonsai' somewhere
+    try std.testing.expect(std.mem.indexOf(u8, path, "zbonsai") != null);
 }

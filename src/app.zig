@@ -114,6 +114,15 @@ pub fn run(self: *App) !void {
         }
     }
 
+    // Save tree state if --save flag was passed
+    if (self.args.save) {
+        if (self.args.seed) |seed| {
+            Args.saveToFile(self.allocator, self.args.saveFile, seed, myCounters.branches) catch |err| {
+                std.debug.print("Warning: Could not save to {s}: {}\n", .{ self.args.saveFile, err });
+            };
+        }
+    }
+
     // If -p flag passed to program, print the tree to terminal after completion
     if (self.args.printTree) {
         try self.vx.exitAltScreen(self.tty.writer());
@@ -841,37 +850,4 @@ fn getTreeWinMaxX(self: *App) u16 {
     return switch (self.args.baseType) {
         .none, .small, .large => (win.width),
     };
-}
-
-fn saveToFile(file_absolute_path: []const u8, seed: u64, branch_count: u64) !void {
-    var file = try std.fs.createFileAbsolute(file_absolute_path, .{});
-    defer file.close();
-
-    var buffer: [100]u8 = undefined;
-    const buf = buffer[0..];
-    const file_contents = try std.fmt.bufPrint(buf, "{d} {d}", .{ seed, branch_count });
-
-    try file.writeAll(file_contents);
-}
-
-fn loadFromFile(args: *Args) !void {
-    var file = try std.fs.openFileAbsolute(args.loadFile, .{ .mode = .read_only });
-    defer file.close();
-
-    // Read from file using a buffered reader
-    var buf_reader = io.bufferedReader(file.reader());
-    const reader = buf_reader.reader();
-
-    // Read values from file
-    var buffer: [100]u8 = undefined;
-    const line = try reader.readUntilDelimiterOrEof(&buffer, '\n') orelse return error.EmptyFile;
-
-    // Parse the values
-    var iter = std.mem.tokenizeScalar(u8, line, ' ');
-
-    const seedStr = iter.next() orelse return error.InvalidFormat;
-    const branchCountStr = iter.next() orelse return error.InvalidFormat;
-
-    args.*.seed = try std.fmt.parseInt(i32, seedStr, 10);
-    args.*.targetBranchCount = try std.fmt.parseInt(i32, branchCountStr, 10);
 }
