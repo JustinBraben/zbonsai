@@ -18,19 +18,9 @@ pub fn main() !void {
         return;
     }
 
-    // By default leaves will just be '&'
-    var leavesInput: [128]u8 = @splat('&');
-    var tokens = std.mem.tokenizeScalar(u8, &leavesInput, ',');
-    while (tokens.next()) |token| {
-        if (args.leavesSize < 100) {
-            args.leaves[args.leavesSize] = token[0];
-            args.leavesSize += 1;
-        }
-    }
-
     // Initialize our application
     var buffer: [1024]u8 = undefined;
-    var app = try App.init(allocator, args, &buffer);
+    var app = try App.init(allocator, &args, &buffer);
     defer app.deinit();
 
     // Run the application

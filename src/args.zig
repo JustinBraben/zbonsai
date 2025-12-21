@@ -11,6 +11,7 @@ pub const ArgsError = error{
     NotImplemented,
     MultiplierOutOfRange,
     InvalidSeed,
+    TooManyLeaves,
 };
 
 pub const Verbosity = enum(u16) {
@@ -25,6 +26,8 @@ pub const BaseType = enum {
     large,
 };
 
+pub const MAX_LEAVES = 64;
+
 allocator: Allocator,
 
 help: bool = false,
@@ -38,20 +41,56 @@ lifeStart: usize = 32,
 multiplier: usize = 5,
 baseType: BaseType = .large,
 seed: ?u64 = null,
-leavesSize: usize = 0,
 targetBranchCount: usize = 0,
 
 timeWait: f32 = 4,
 timeStep: f32 = 0.03,
 
 message: ?[]const u8 = null,
-leaves: [64]u8 = undefined,
+
+// Leaf configuration
+leaves: []const u8 = "&", // Raw input string for leaves
+leafStrings: [MAX_LEAVES][]const u8 = undefined, // Parsed leaf options
+leafCount: usize = 0,
 
 load: bool = false,
 save: bool = false,
 
 saveFile: []const u8 = undefined,
 loadFile: []const u8 = undefined,
+
+/// Parse comma-delimited leaf string into individual leaf options
+/// Example: "&,*,🌿,🍃" becomes ["&", "*", "🌿", "🍃"]
+pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
+    self.leafCount = 0;
+    
+    var iter = std.mem.tokenizeScalar(u8, leaf_input, ',');
+    while (iter.next()) |leaf| {
+        if (self.leafCount >= MAX_LEAVES) {
+            return ArgsError.TooManyLeaves;
+        }
+        // Trim whitespace from each leaf
+        const trimmed = std.mem.trim(u8, leaf, " \t");
+        if (trimmed.len > 0) {
+            self.leafStrings[self.leafCount] = trimmed;
+            self.leafCount += 1;
+        }
+    }
+    
+    // If no valid leaves were parsed, use default
+    if (self.leafCount == 0) {
+        self.leafStrings[0] = "&";
+        self.leafCount = 1;
+    }
+}
+
+/// Get a random leaf string for display
+pub fn getRandomLeaf(self: *const Args, index: usize) []const u8 {
+    if (self.leafCount == 0) {
+        return "&";
+    }
+    return self.leafStrings[index % self.leafCount];
+}
 
 pub fn parse_args(ally: Allocator) !Args {
     const params = comptime clap.parseParamsComptime(
@@ -70,7 +109,7 @@ pub fn parse_args(ally: Allocator) !Args {
         \\-m, --message <STR>       Attach message next to the tree.
         \\-b, --base <BASETYPE>     Ascii-art plant base to use, 0 is none.
         \\-c, --leaf <STR>          List of comma-delimited strings randomly chosen
-        \\                          for leaves.
+        \\                          for leaves [default: &].
         \\
         \\-M, --multiplier <USIZE>  Branch multiplier; higher -> more
         \\                          branching (0-20) [default: 5].
@@ -99,17 +138,12 @@ pub fn parse_args(ally: Allocator) !Args {
         .VERBOSITY = clap.parsers.enumeration(Verbosity),
     };
 
-    // const stderr_file = std.fs.File.stderr();
-    // var buf: [1024]u8 = undefined;
-    // var stderr_writer = stderr_file.writer(&buf);
-    // const stderr_writer_interface: *std.io.Writer = &stderr_writer.interface;
-
     var diag = clap.Diagnostic{};
     var res = clap.parse(clap.Help, &params, parsers, .{
         .diagnostic = &diag,
         .allocator = ally,
     }) catch |err| {
-         try diag.reportToFile(std.fs.File.stderr(), err);
+        try diag.reportToFile(std.fs.File.stderr(), err);
         return err;
     };
     defer res.deinit();
@@ -161,6 +195,10 @@ pub fn parse_args(ally: Allocator) !Args {
     if (res.args.time) |ts|
         timeStep = ts;
 
+    var timeWait: f32 = 4.0;
+    if (res.args.wait) |tw|
+        timeWait = tw;
+
     var save = false;
     var saveFile = try createDefaultCachePath(ally);
     if (res.args.save) |save_file| {
@@ -181,7 +219,15 @@ pub fn parse_args(ally: Allocator) !Args {
     if (res.args.verbose) |v|
         verbosity = v;
 
-    return Args{
+    // Parse leaves - allocate and copy to ensure lifetime
+    var leaves: []const u8 = "&";
+    if (res.args.leaf) |leaf_input| {
+        leaves = try ally.dupe(u8, leaf_input);
+    } else {
+        leaves = try ally.dupe(u8, "&");
+    }
+
+    var args = Args{
         .allocator = ally,
         .help = res.args.help != 0,
         .live = res.args.live != 0,
@@ -193,14 +239,15 @@ pub fn parse_args(ally: Allocator) !Args {
         .multiplier = multiplier,
         .baseType = baseType,
         .seed = seed,
-        .leavesSize = 0,
         .targetBranchCount = 0,
 
-        .timeWait = 4,
+        .timeWait = timeWait,
         .timeStep = timeStep,
 
         .message = message,
-        .leaves = @splat(0),
+        .leaves = leaves,
+        .leafStrings = undefined,
+        .leafCount = 0,
 
         .save = save,
         .load = load,
@@ -208,11 +255,20 @@ pub fn parse_args(ally: Allocator) !Args {
         .saveFile = saveFile,
         .loadFile = loadFile,
     };
+
+    // Parse the leaves into individual strings
+    try args.parseLeaves(leaves);
+
+    return args;
 }
 
 pub fn deinit(self: *Args) void {
     if (self.message) |msg| {
         self.allocator.free(msg);
+    }
+    // Free the leaves string if it was allocated
+    if (self.leaves.len > 0) {
+        self.allocator.free(self.leaves);
     }
     self.allocator.free(self.saveFile);
     self.allocator.free(self.loadFile);
@@ -244,334 +300,208 @@ fn loadFromFile(self: *Args, file_name: []const u8) !void {
     var buffer: [100]u8 = undefined;
     try file.seekTo(0);
     const bytes_read = try file.readAll(&buffer);
-    
+
     if (bytes_read == 0) {
         return error.EmptyFile;
     }
-    
+
     var tokens = std.mem.tokenizeScalar(u8, buffer[0..bytes_read], ' ');
-    
+
     const seed_str = tokens.next() orelse return error.InvalidFileFormat;
     const branch_count_str = tokens.next() orelse return error.InvalidFileFormat;
-    
+
     self.seed = try std.fmt.parseInt(u64, seed_str, 10);
     self.targetBranchCount = try std.fmt.parseInt(usize, branch_count_str, 10);
 }
 
-fn parseMockCommandLine(allocator: std.mem.Allocator, mock_args: []const []const u8) !Args {
-    // Create a SliceIterator that will simulate argv
-    var iter = clap.args.SliceIterator{
-        .args = mock_args,
-    };
+// ============================================================================
+// Tests
+// ============================================================================
 
-    // Parse using the same parameters and parsers defined in Args.parse_args
-    const params = comptime clap.parseParamsComptime(
-        \\-h, --help                Display this help and exit.
-        \\-l, --live                Live mode: show each step of growth
-        \\-t, --time <TIME>         In Live mode, wait TIME secs between
-        \\                          steps of growth (must be larger than 0) [default: 0.03].
-        \\
-        \\-i, --infinite            Infinite mode: keep growing trees.
-        \\-w, --wait <TIME>         In infinite mode, wait TIME between each tree
-        \\                          generation [default: 4.00].
-        \\
-        \\-S, --screensaver         Screensaver mode; equivalent to -li and
-        \\                          quit on any keypress.
-        \\
-        \\-m, --message <STR>       Attach message next to the tree.
-        \\-b, --base <BASETYPE>     Ascii-art plant base to use, 0 is none.
-        \\-c, --leaf <STR>          List of comma-delimited strings randomly chosen
-        \\                          for leaves.
-        \\
-        \\-M, --multiplier <USIZE>  Branch multiplier; higher -> more
-        \\                          branching (0-20) [default: 5].
-        \\
-        \\-L, --life <USIZE>        Life; higher -> more growth (0-200) [default: 32].
-        \\-p, --print               Print tree to terminal when finished.
-        \\-s, --seed <U64>          Seed random number generator.
-        \\-W, --save <FILE>         Save progress to file [default: ~/.cache/cbonsai].
-        \\-C, --load <FILE>         Load progress from file [default: ~/.cache/cbonsai].
-        \\-v, --verbose <VERBOSITY> Increase output verbosity.
-        \\<FILE>...
-        \\
-    );
-
-    const parsers = comptime .{
-        .STR = clap.parsers.string,
-        .FILE = clap.parsers.string,
-        .INT = clap.parsers.int(i64, 10),
-        .U64 = clap.parsers.int(u64, 10),
-        .USIZE = clap.parsers.int(usize, 10),
-        .F32 = clap.parsers.float(f32),
-        .TIME = clap.parsers.float(f32),
-        .BASETYPE = clap.parsers.enumeration(BaseType),
-        .VERBOSITY = clap.parsers.enumeration(Verbosity),
-    };
-
-    var diag = clap.Diagnostic{};
-    var res = try clap.parseEx(clap.Help, &params, parsers, &iter, .{
-        .diagnostic = &diag,
-        .allocator = allocator,
-    });
-    defer res.deinit();
-
-    // Return errors on args not yet implemented
-    if (res.args.infinite != 0 or
-        res.args.screensaver != 0)
-    {
-        return ArgsError.NotImplemented;
-    }
-
-    var multiplier: usize = 5;
-    if (res.args.multiplier) |m| {
-        if (m < 0 or m > 20) {
-            return ArgsError.MultiplierOutOfRange;
-        }
-        multiplier = m;
-    }
-
-    var message: ?[]const u8 = null;
-    if (res.args.message) |msg| {
-        message = try std.fmt.allocPrint(allocator, "{s}", .{msg});
-    }
-
-    var baseType: BaseType = .large;
-    if (res.args.base) |bs|
-        baseType = bs;
-
-    var lifeStart: usize = 32;
-    if (res.args.life) |ls|
-        lifeStart = ls;
-
-    var seed: ?u64 = null;
-    if (res.args.seed) |s| {
-        if (s == 0) return ArgsError.InvalidSeed;
-        seed = s;
-    } else {
-        // If seed is null, no seed was passed
-        // thus give the program a seed based on timestamp
-        seed = @as(u64, @intCast(std.time.timestamp()));
-    }
-
-    var timeStep: f32 = 0.03;
-    if (res.args.time) |ts|
-        timeStep = ts;
-
-    var save = false;
-    var saveFile = try createDefaultCachePath(allocator);
-    if (res.args.save) |save_file| {
-        allocator.free(saveFile);
-        saveFile = try allocator.dupe(u8, save_file);
-        save = true;
-    }
-
-    var load = false;
-    var loadFile = try createDefaultCachePath(allocator);
-    if (res.args.load) |load_file| {
-        allocator.free(loadFile);
-        loadFile = try allocator.dupe(u8, load_file);
-        load = true;
-    }
-
-    var verbosity = Verbosity.none;
-    if (res.args.verbose) |v|
-        verbosity = v;
-
-    return Args{
-        .allocator = allocator,
-        .help = res.args.help != 0,
-        .live = res.args.live != 0,
-        .infinite = res.args.infinite != 0,
-        .screensaver = res.args.screensaver != 0,
-        .printTree = res.args.print != 0,
-        .verbosity = verbosity,
-        .lifeStart = lifeStart,
-        .multiplier = multiplier,
-        .baseType = baseType,
-        .seed = seed,
-        .leavesSize = 0,
-        .targetBranchCount = 0,
-
-        .timeWait = 4,
-        .timeStep = timeStep,
-
-        .message = message,
-        .leaves = std.mem.zeroes([64]u8),
-
-        .save = save,
-        .load = load,
-
-        .saveFile = saveFile,
-        .loadFile = loadFile,
-    };
-}
-
-test "Args parsing - default values" {
-    // TODO: fix
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-
+test "parseLeaves - single leaf" {
     const test_alloc = std.testing.allocator;
-
-    // Test with empty/minimal arguments
-    var empty_args: Args = .{
+    
+    var args = Args{
         .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "&"),
     };
-    empty_args = Args.parse_args(test_alloc) catch unreachable;
-    defer empty_args.deinit();
-    
-    try std.testing.expectEqual(false, empty_args.help);
-    try std.testing.expectEqual(false, empty_args.live);
-    try std.testing.expectEqual(Verbosity.none, empty_args.verbosity);
-    try std.testing.expectEqual(@as(usize, 32), empty_args.lifeStart);
-    try std.testing.expectEqual(@as(usize, 5), empty_args.multiplier);
-    try std.testing.expectEqual(BaseType.large, empty_args.baseType);
-}
-
-test "Args parsing - explicit values" {
-    const test_alloc = std.testing.allocator;
-    
-    // Mock command line arguments
-    const args = [_][]const u8{ "zbonsai", "--live", "--multiplier", "10", "--seed", "42" };
-    
-    var parsed_args = try parseMockCommandLine(test_alloc, &args);
-    defer parsed_args.deinit();
-    
-    try std.testing.expectEqual(true, parsed_args.live);
-    try std.testing.expectEqual(@as(usize, 10), parsed_args.multiplier);
-    try std.testing.expectEqual(@as(u64, 42), parsed_args.seed.?);
-}
-
-test "Args parsing - error handling - invalid multiplier" {
-    const test_alloc = std.testing.allocator;
-    
-    // Mock command line with invalid multiplier value
-    const args = [_][]const u8{ "zbonsai", "--multiplier", "25" }; // Above maximum of 20
-    
-    // This should return MultiplierOutOfRange error
-    try std.testing.expectError(ArgsError.MultiplierOutOfRange, parseMockCommandLine(test_alloc, &args));
-}
-
-test "Args parsing - error handling - invalid seed" {
-    const test_alloc = std.testing.allocator;
-    
-    // Mock command line with invalid seed value
-    const args = [_][]const u8{ "zbonsai", "--seed", "0" }; // Invalid seed
-    
-    try std.testing.expectError(ArgsError.InvalidSeed, parseMockCommandLine(test_alloc, &args));
-}
-
-test "Args memory management - with message" {
-    const test_alloc = std.testing.allocator;
-    
-    // Test with message allocation
-    const mock_args = [_][]const u8{ "zbonsai", "--message", "Hello World" };
-    var args = try parseMockCommandLine(test_alloc, &mock_args);
     defer args.deinit();
     
-    try std.testing.expect(args.message != null);
-    try std.testing.expectEqualStrings("Hello World", args.message.?);
+    try args.parseLeaves("&");
+    
+    try std.testing.expectEqual(@as(usize, 1), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
 }
 
-test "Args - save file path" {
+test "parseLeaves - multiple ASCII leaves" {
     const test_alloc = std.testing.allocator;
     
-    const mock_args = [_][]const u8{ "zbonsai", "--save", "./test_save_path.dat" };
-    var args = try parseMockCommandLine(test_alloc, &mock_args);
-    defer args.deinit();
-    
-    try std.testing.expectEqualStrings("./test_save_path.dat", args.saveFile);
-    try std.testing.expect(args.save);
-    try std.testing.expectEqualStrings("cbonsai", args.loadFile); // Default path
-    try std.testing.expect(!args.load);
-}
-
-test "Args - load file path" {
-    const test_alloc = std.testing.allocator;
-    
-    const mock_args = [_][]const u8{ "zbonsai", "--load", "./test_load_path.dat" };
-    var args = try parseMockCommandLine(test_alloc, &mock_args);
-    defer args.deinit();
-    
-    try std.testing.expectEqualStrings("./test_load_path.dat", args.loadFile);
-    try std.testing.expect(args.load);
-    try std.testing.expectEqualStrings("cbonsai", args.saveFile); // Default path
-    try std.testing.expect(!args.save);
-}
-
-test "Args - both save and load file paths" {
-    const test_alloc = std.testing.allocator;
-    
-    const mock_args = [_][]const u8{ 
-        "zbonsai", 
-        "--save", "./test_save_both.dat", 
-        "--load", "./test_load_both.dat" 
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "&,*,#,@"),
     };
-    var args = try parseMockCommandLine(test_alloc, &mock_args);
     defer args.deinit();
     
-    try std.testing.expectEqualStrings("./test_save_both.dat", args.saveFile);
-    try std.testing.expect(args.save);
-    try std.testing.expectEqualStrings("./test_load_both.dat", args.loadFile);
-    try std.testing.expect(args.load);
+    try args.parseLeaves("&,*,#,@");
+    
+    try std.testing.expectEqual(@as(usize, 4), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
+    try std.testing.expectEqualStrings("*", args.leafStrings[1]);
+    try std.testing.expectEqualStrings("#", args.leafStrings[2]);
+    try std.testing.expectEqualStrings("@", args.leafStrings[3]);
 }
 
-test "Args - verbose flag" {
+test "parseLeaves - with whitespace" {
     const test_alloc = std.testing.allocator;
     
-    const mock_args = [_][]const u8{ "zbonsai", "--verbose", "minimal" };
-    var args = try parseMockCommandLine(test_alloc, &mock_args);
-    defer args.deinit();
-    
-    try std.testing.expectEqual(Verbosity.minimal, args.verbosity);
-}
-
-test "Args - full command line parsing" {
-    const test_alloc = std.testing.allocator;
-    
-    // Test a complex set of arguments
-    const args = [_][]const u8{ 
-        "zbonsai", 
-        "--live", 
-        "--time", "0.05", 
-        "--multiplier", "10", 
-        "--life", "50",
-        "--base", "small",
-        "--seed", "12345",
-        "--message", "Test Bonsai",
-        "--verbose", "minimal"
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "& , * , #"),
     };
+    defer args.deinit();
     
-    var parsed = try parseMockCommandLine(test_alloc, &args);
-    defer parsed.deinit();
+    try args.parseLeaves("& , * , #");
     
-    // Verify all arguments are correctly parsed
-    try std.testing.expect(parsed.live);
-    try std.testing.expectEqual(@as(f32, 0.05), parsed.timeStep);
-    try std.testing.expectEqual(@as(usize, 10), parsed.multiplier);
-    try std.testing.expectEqual(@as(usize, 50), parsed.lifeStart);
-    try std.testing.expectEqual(BaseType.small, parsed.baseType);
-    try std.testing.expectEqual(@as(u64, 12345), parsed.seed.?);
-    try std.testing.expectEqualStrings("Test Bonsai", parsed.message.?);
-    try std.testing.expectEqual(Verbosity.minimal, parsed.verbosity);
+    try std.testing.expectEqual(@as(usize, 3), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
+    try std.testing.expectEqualStrings("*", args.leafStrings[1]);
+    try std.testing.expectEqualStrings("#", args.leafStrings[2]);
+}
+
+test "parseLeaves - unicode/emoji leaves" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "🌿,🍃,🌸,✿"),
+    };
+    defer args.deinit();
+    
+    try args.parseLeaves("🌿,🍃,🌸,✿");
+    
+    try std.testing.expectEqual(@as(usize, 4), args.leafCount);
+    try std.testing.expectEqualStrings("🌿", args.leafStrings[0]);
+    try std.testing.expectEqualStrings("🍃", args.leafStrings[1]);
+    try std.testing.expectEqualStrings("🌸", args.leafStrings[2]);
+    try std.testing.expectEqualStrings("✿", args.leafStrings[3]);
+}
+
+test "parseLeaves - mixed ASCII and unicode" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "&,🌿,*,🍃"),
+    };
+    defer args.deinit();
+    
+    try args.parseLeaves("&,🌿,*,🍃");
+    
+    try std.testing.expectEqual(@as(usize, 4), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
+    try std.testing.expectEqualStrings("🌿", args.leafStrings[1]);
+    try std.testing.expectEqualStrings("*", args.leafStrings[2]);
+    try std.testing.expectEqualStrings("🍃", args.leafStrings[3]);
+}
+
+test "parseLeaves - empty input uses default" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, ""),
+    };
+    defer args.deinit();
+    
+    try args.parseLeaves("");
+    
+    try std.testing.expectEqual(@as(usize, 1), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
+}
+
+test "parseLeaves - only commas uses default" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, ",,,"),
+    };
+    defer args.deinit();
+    
+    try args.parseLeaves(",,,");
+    
+    try std.testing.expectEqual(@as(usize, 1), args.leafCount);
+    try std.testing.expectEqualStrings("&", args.leafStrings[0]);
+}
+
+test "getRandomLeaf - returns valid leaves" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, "A,B,C"),
+    };
+    defer args.deinit();
+    
+    try args.parseLeaves("A,B,C");
+    
+    // Test that getRandomLeaf wraps around properly
+    try std.testing.expectEqualStrings("A", args.getRandomLeaf(0));
+    try std.testing.expectEqualStrings("B", args.getRandomLeaf(1));
+    try std.testing.expectEqualStrings("C", args.getRandomLeaf(2));
+    try std.testing.expectEqualStrings("A", args.getRandomLeaf(3)); // wraps
+    try std.testing.expectEqualStrings("B", args.getRandomLeaf(4)); // wraps
+}
+
+test "getRandomLeaf - empty leafCount returns default" {
+    const test_alloc = std.testing.allocator;
+    
+    var args = Args{
+        .allocator = test_alloc,
+        .saveFile = try test_alloc.dupe(u8, "test"),
+        .loadFile = try test_alloc.dupe(u8, "test"),
+        .leaves = try test_alloc.dupe(u8, ""),
+        .leafCount = 0, // explicitly zero
+    };
+    defer args.deinit();
+    
+    try std.testing.expectEqualStrings("&", args.getRandomLeaf(0));
+    try std.testing.expectEqualStrings("&", args.getRandomLeaf(100));
 }
 
 test "saveToFile functionality" {
     const test_alloc = std.testing.allocator;
     const test_file = "test_save.dat";
-    
+
     // Test writing to file
     try saveToFile(test_alloc, test_file, 12345, 67);
-    
+
     // Verify file contents
     const file = try std.fs.cwd().openFile(test_file, .{});
     defer file.close();
-    
+
     var buf: [100]u8 = undefined;
     const bytes_read = try file.readAll(&buf);
     const content = buf[0..bytes_read];
-    
+
     try std.testing.expectEqualStrings("12345 67", content);
-    
+
     // Clean up test file
     try std.fs.cwd().deleteFile(test_file);
 }

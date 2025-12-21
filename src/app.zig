@@ -50,11 +50,11 @@ loop: vaxis.Loop(Event),
 /// Roll the dice for Random number generator
 dice: Dice,
 /// Arguments passed in from command line
-args: Args,
+args: *const Args,
 debug_buffer: [512]u8 = undefined,
 initial_resize_handled: bool = false,
 
-pub fn init(allocator: Allocator, args: Args, buffer: []u8) !App {
+pub fn init(allocator: Allocator, args: *const Args, buffer: []u8) !App {
     return .{
         .allocator = allocator,
         .should_quit = false,
@@ -109,8 +109,7 @@ pub fn run(self: *App) !void {
 
         if (self.args.printTree) {
             self.should_quit = true;
-        }
-        else {
+        } else {
             try self.renderScreen();
         }
     }
@@ -166,7 +165,8 @@ pub fn renderScreen(self: *App) !void {
 pub fn drawConfig(self: *App) !void {
     const win = self.vx.window();
 
-    const msg = try std.fmt.bufPrint(&self.debug_buffer,
+    const msg = try std.fmt.bufPrint(
+        &self.debug_buffer,
         \\live: {}
         \\infinite: {}
         \\screensaver: {}
@@ -174,15 +174,19 @@ pub fn drawConfig(self: *App) !void {
         \\seed: {d}
         \\saveFile: {s}
         \\loadFile: {s}
-    , .{
-        self.args.live,
-        self.args.infinite,
-        self.args.screensaver,
-        self.args.printTree,
-        self.args.seed,
-        self.args.saveFile,
-        self.args.loadFile,
-    });
+        \\leafCount: {d}
+    ,
+        .{
+            self.args.live,
+            self.args.infinite,
+            self.args.screensaver,
+            self.args.printTree,
+            self.args.seed,
+            self.args.saveFile,
+            self.args.loadFile,
+            self.args.leafCount,
+        },
+    );
     _ = win.printSegment(.{ .text = msg[0..], .style = .{} }, .{});
 }
 
@@ -475,14 +479,17 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         const win = self.vx.window();
 
         if (self.args.verbosity != .none) {
-            const msg = try std.fmt.bufPrint(&self.debug_buffer, 
+            const msg = try std.fmt.bufPrint(
+                &self.debug_buffer,
                 \\maxX: {d}, maxY: {d}
                 \\
                 \\dx: {d}
                 \\dy: {d}
                 \\type: {s}
                 \\shootCooldown: {d}
-            , .{ win.width, win.height, dx, dy, @tagName(branch_type), shootCooldown });
+            ,
+                .{ win.width, win.height, dx, dy, @tagName(branch_type), shootCooldown },
+            );
 
             const verbose_child = win.child(.{
                 .x_off = 5,
@@ -499,24 +506,24 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         if (dx > 0) {
             x = @min(x +| @as(u16, @intCast(@abs(dx))), self.getTreeWinMaxX() -| 2);
         } else if (dx < 0) {
-            x = if (x > @as(u16, @intCast(@abs(dx)))) 
+            x = if (x > @as(u16, @intCast(@abs(dx))))
                 x -| @as(u16, @intCast(@abs(dx)))
-            else 
+            else
                 1;
         }
 
         if (dy > 0) {
             y = @min(y +| @as(u16, @intCast(@abs(dy))), self.getTreeWinMaxY());
         } else if (dy < 0) {
-            y = if (y > @as(u16, @intCast(@abs(dy)))) 
+            y = if (y > @as(u16, @intCast(@abs(dy))))
                 y -| @as(u16, @intCast(@abs(dy)))
-            else 
+            else
                 1;
         }
 
         // Choose color for this branch
         const style = self.chooseColor(branch_type);
-        const branch_str = try self.chooseString(branch_type, life, dx, dy);
+        const branch_str = self.chooseString(branch_type, life, dx, dy);
 
         // Draw branch
         const tree_child = self.vx.window().child(.{
@@ -560,11 +567,11 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
                 } else if (dice >= 2 and dice <= 4) {
                     returnDx.* = -1; // Slight left
                 } else if (dice >= 5 and dice <= 6) {
-                    returnDx.* = 0;  // Straight
+                    returnDx.* = 0; // Straight
                 } else if (dice >= 7 and dice <= 9) {
-                    returnDx.* = 1;  // Slight right
+                    returnDx.* = 1; // Slight right
                 } else if (dice >= 10 and dice <= 11) {
-                    returnDx.* = 2;  // Occasional strong right
+                    returnDx.* = 2; // Occasional strong right
                 }
             }
             // Middle-aged trunk - more upward growth
@@ -573,13 +580,13 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
                 if (dice > 1) {
                     returnDy.* = -1; // More consistent upward growth (80%)
                 } else {
-                    returnDy.* = 0;  // Occasional pause in height (20%)
+                    returnDy.* = 0; // Occasional pause in height (20%)
                 }
 
                 // Less horizontal movement for mature trunk
-                returnDx.* = if (self.dice.rollI64(5) == 0) 
+                returnDx.* = if (self.dice.rollI64(5) == 0)
                     self.dice.rollI64(3) - 1 // Occasional horizontal movement
-                else 
+                else
                     0; // Usually straight up for mature trunk
             }
         },
@@ -590,9 +597,9 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             if (dice >= 0 and dice <= 2) {
                 returnDy.* = -1; // 25% chance to grow upward
             } else if (dice >= 3 and dice <= 8) {
-                returnDy.* = 0;  // 50% chance to grow level
+                returnDy.* = 0; // 50% chance to grow level
             } else if (dice >= 9 and dice <= 11) {
-                returnDy.* = 1;  // 25% chance to grow downward
+                returnDy.* = 1; // 25% chance to grow downward
             }
 
             // Strong left bias for left shoots
@@ -602,9 +609,9 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             } else if (dice >= 3 and dice <= 7) {
                 returnDx.* = -1; // Moderate left
             } else if (dice >= 8 and dice <= 10) {
-                returnDx.* = 0;  // Sometimes straight
+                returnDx.* = 0; // Sometimes straight
             } else if (dice == 11) {
-                returnDx.* = 1;  // Rarely right (natural variation)
+                returnDx.* = 1; // Rarely right (natural variation)
             }
         },
         .shootRight => {
@@ -613,19 +620,19 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             if (dice >= 0 and dice <= 2) {
                 returnDy.* = -1; // 25% chance to grow upward
             } else if (dice >= 3 and dice <= 8) {
-                returnDy.* = 0;  // 50% chance to grow level
+                returnDy.* = 0; // 50% chance to grow level
             } else if (dice >= 9 and dice <= 11) {
-                returnDy.* = 1;  // 25% chance to grow downward
+                returnDy.* = 1; // 25% chance to grow downward
             }
 
             // Strong right bias for right shoots
             dice = self.dice.rollI64(12);
             if (dice >= 0 and dice <= 2) {
-                returnDx.* = 2;  // Strong right
+                returnDx.* = 2; // Strong right
             } else if (dice >= 3 and dice <= 7) {
-                returnDx.* = 1;  // Moderate right
+                returnDx.* = 1; // Moderate right
             } else if (dice >= 8 and dice <= 10) {
-                returnDx.* = 0;  // Sometimes straight
+                returnDx.* = 0; // Sometimes straight
             } else if (dice == 11) {
                 returnDx.* = -1; // Rarely left (natural variation)
             }
@@ -637,12 +644,12 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             if (dice >= 0 and dice <= 4) {
                 returnDy.* = -1; // 33% up
             } else if (dice >= 5 and dice <= 9) {
-                returnDy.* = 0;  // 33% level
+                returnDy.* = 0; // 33% level
             } else if (dice >= 10 and dice <= 14) {
-                returnDy.* = 1;  // 33% down
+                returnDy.* = 1; // 33% down
             }
 
-            // Wide horizontal spread for foliage 
+            // Wide horizontal spread for foliage
             dice = self.dice.rollI64(15);
             if (dice == 0) {
                 returnDx.* = -3;
@@ -667,9 +674,9 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             if (dice >= 0 and dice <= 3) {
                 returnDy.* = -1; // 33% up
             } else if (dice >= 4 and dice <= 7) {
-                returnDy.* = 0;  // 33% level 
+                returnDy.* = 0; // 33% level
             } else if (dice >= 8 and dice <= 11) {
-                returnDy.* = 1;  // 33% down
+                returnDy.* = 1; // 33% down
             }
 
             // Wide but controlled spread
@@ -689,15 +696,13 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
 
     if (returnDx.* > 1) {
         returnDx.* = 1;
-    }
-    else if (returnDx.* < -1) {
+    } else if (returnDx.* < -1) {
         returnDx.* = -1;
     }
 
     if (returnDy.* > 1) {
         returnDy.* = 1;
-    }
-    else if (returnDy.* < -1) {
+    } else if (returnDy.* < -1) {
         returnDy.* = -1;
     }
 }
@@ -710,7 +715,7 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
             const browns = [_]u8{ 94, 130, 136, 137, 173 }; // Various brown terminal colors
             const idx = self.dice.rollUsize(browns.len);
             const bold = self.dice.rollI64(4) == 0; // 25% chance of bold
-            
+
             return vaxis.Style{
                 .fg = .{ .index = browns[idx] },
                 .bold = bold,
@@ -721,7 +726,7 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
             const shoot_colors = [_]u8{ 130, 131, 136, 137, 138, 179 };
             const idx = self.dice.rollUsize(shoot_colors.len);
             const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
-            
+
             return vaxis.Style{
                 .fg = .{ .index = shoot_colors[idx] },
                 .bold = bold,
@@ -732,7 +737,7 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
             const greens = [_]u8{ 2, 22, 28, 34, 40, 46, 70, 76, 82, 112, 118 };
             const idx = self.dice.rollUsize(greens.len);
             const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
-            
+
             return vaxis.Style{
                 .fg = .{ .index = greens[idx] },
                 .bold = bold,
@@ -743,7 +748,7 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
             const leaf_greens = [_]u8{ 10, 40, 46, 47, 48, 77, 78, 82, 83, 84, 85, 119, 120 };
             const idx = self.dice.rollUsize(leaf_greens.len);
             const bold = self.dice.rollI64(2) == 0; // 50% chance of bold for more vibrant leaves
-            
+
             return vaxis.Style{
                 .fg = .{ .index = leaf_greens[idx] },
                 .bold = bold,
@@ -752,8 +757,8 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     }
 }
 
-/// Return a String for the tree
-fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) ![]const u8 {
+/// Return a String for the tree branch or leaf
+fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) []const u8 {
     var branch_type = branch_type_input;
     if (life < 4) branch_type = .dying;
 
@@ -808,12 +813,12 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
             }
         },
         .dying, .dead => {
-            // fallback
-            if (self.args.leaves.len == 0) return "&";
-            // reasonable max for leaves
-            const max_len = @min(self.args.leaves.len, 3);
-            const rand_index = self.dice.rollUsize(max_len) + 1;
-            return self.args.leaves[0..rand_index];
+            // Use the parsed leaf strings from args
+            if (self.args.leafCount == 0) {
+                return "&";
+            }
+            const idx = self.dice.rollUsize(self.args.leafCount);
+            return self.args.leafStrings[idx];
         },
     }
 }
@@ -844,7 +849,7 @@ fn saveToFile(file_absolute_path: []const u8, seed: u64, branch_count: u64) !voi
 
     var buffer: [100]u8 = undefined;
     const buf = buffer[0..];
-    const file_contents = try std.fmt.bufPrint(buf, "{d} {d}", .{seed, branch_count});
+    const file_contents = try std.fmt.bufPrint(buf, "{d} {d}", .{ seed, branch_count });
 
     try file.writeAll(file_contents);
 }
@@ -863,10 +868,10 @@ fn loadFromFile(args: *Args) !void {
 
     // Parse the values
     var iter = std.mem.tokenizeScalar(u8, line, ' ');
-    
+
     const seedStr = iter.next() orelse return error.InvalidFormat;
     const branchCountStr = iter.next() orelse return error.InvalidFormat;
-    
+
     args.*.seed = try std.fmt.parseInt(i32, seedStr, 10);
     args.*.targetBranchCount = try std.fmt.parseInt(i32, branchCountStr, 10);
 }

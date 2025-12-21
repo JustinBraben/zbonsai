@@ -62,16 +62,25 @@ test "Dice rolls" {
 test "Dice initialization with seed produces deterministic results" {
     var dice1 = Dice.init(12345);
     var dice2 = Dice.init(12345);
-    
+
     try testing.expectEqual(dice1.rollUsize(100), dice2.rollUsize(100));
     try testing.expectEqual(dice1.rollI64(100), dice2.rollI64(100));
 }
 
 test "Dice roll ranges are within bounds" {
     var dice = Dice.init(42);
-    
+
     for (0..1000) |_| {
         const roll = dice.rollUsize(10);
         try testing.expect(roll < 10);
+    }
+}
+
+test "Dice rollF32 returns values in [0, 1)" {
+    var dice = Dice.init(42);
+
+    for (0..1000) |_| {
+        const f = dice.rollF32();
+        try testing.expect(f >= 0.0 and f < 1.0);
     }
 }

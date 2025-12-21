@@ -1,3 +1,6 @@
+//! test_runner.zig
+//! Credit `jetzig` for this test_runner code
+
 const std = @import("std");
 const builtin = @import("builtin");
 

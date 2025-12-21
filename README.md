@@ -59,6 +59,26 @@ Generate tree live with verbose output.
 zig build run -- -l -v minimal
 ```
 
+Print tree to terminal and give back control
+
+
+```
+zig build run -- -p
+```
+
+Generate tree with custom leaves
+
+```
+# ASCII leaves
+zig build run -- -c "&,*,#,@,+"
+
+# Unicode/emoji leaves  
+zig build run -- -c "🌿,🍃,🌸,✿,🌺"
+
+# Mixed
+zig build run -- -c "&,🌿,*,🍃"
+```
+
 ## Dependencies
 
 - [libvaxis](https://github.com/libvaxis/libvaxis): A Zig library for creating terminal user interfaces
