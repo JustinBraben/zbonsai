@@ -84,33 +84,78 @@ pub fn run(self: *App) !void {
 
     var myCounters: Counters = .{};
 
-    var pass_finished = false;
-
+    // Outer loop for infinite mode - grows trees repeatedly
     while (!self.should_quit) {
-        // pollEvent blocks until we have an event
-        self.loop.pollEvent();
-        // tryEvent returns events if one is available
-        // does not block
-        while (self.loop.tryEvent()) |event| {
-            try self.update(event, &myCounters, &pass_finished);
+        var pass_finished = false;
+
+        // Inner loop - grows a single tree
+        while (!self.should_quit) {
+            // pollEvent blocks until we have an event
+            self.loop.pollEvent();
+            // tryEvent returns events if one is available
+            // does not block
+            while (self.loop.tryEvent()) |event| {
+                try self.update(event, &myCounters, &pass_finished);
+            }
+
+            // Resets window, draws the base of the tree
+            // then grows the tree. If -l passed it you will view
+            // generation live. Once the tree has finished growing it will no longer draw anymore
+            if (!pass_finished) {
+                const win = self.vx.window();
+                win.clear();
+                try self.drawWins();
+                try self.drawMessage();
+                try self.growTree(&myCounters);
+                pass_finished = true;
+            }
+
+            if (self.args.printTree) {
+                self.should_quit = true;
+            } else {
+                try self.renderScreen();
+            }
+
+            // Tree finished growing, break inner loop
+            if (pass_finished) break;
         }
 
-        // Resets window, draws the base of the tree
-        // then grows the tree. If -l passed it you will view
-        // generation live. Once the tree has finished growing it will no longer draw anymore
-        if (!pass_finished) {
-            const win = self.vx.window();
-            win.clear();
-            try self.drawWins();
-            try self.drawMessage();
-            try self.growTree(&myCounters);
-            pass_finished = true;
+        // If not in infinite mode, exit after first tree
+        if (!self.args.infinite) {
+            break;
         }
 
-        if (self.args.printTree) {
-            self.should_quit = true;
-        } else {
-            try self.renderScreen();
+        // In infinite mode: wait for timeWait seconds, checking for quit
+        if (!self.should_quit) {
+            const wait_ms: u64 = @intFromFloat(self.args.timeWait * std.time.ms_per_s);
+            const check_interval_ms: u64 = 100; // Check for input every 100ms
+            var waited: u64 = 0;
+
+            while (waited < wait_ms and !self.should_quit) {
+                // Check for key events during wait
+                while (self.loop.tryEvent()) |event| {
+                    switch (event) {
+                        .key_press => |key| {
+                            if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
+                                self.should_quit = true;
+                            }
+                        },
+                        else => {},
+                    }
+                }
+
+                if (!self.should_quit) {
+                    std.Thread.sleep(check_interval_ms * std.time.ns_per_ms);
+                    waited += check_interval_ms;
+                }
+            }
+
+            // Generate new seed for next tree
+            if (!self.should_quit) {
+                const new_seed = @as(u64, @intCast(std.time.timestamp()));
+                self.dice = Dice.init(new_seed);
+                myCounters = .{}; // Reset counters for new tree
+            }
         }
     }
 
@@ -134,7 +179,8 @@ pub fn run(self: *App) !void {
 pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *bool) !void {
     switch (event) {
         .key_press => |key| {
-            if (key.matches('c', .{ .ctrl = true })) {
+            // Quit on Ctrl+C or 'q'
+            if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                 self.should_quit = true;
             }
         },
@@ -417,7 +463,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         while (self.loop.tryEvent()) |event| {
             switch (event) {
                 .key_press => |key| {
-                    if (key.matches('c', .{ .ctrl = true })) {
+                    if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                         self.should_quit = true;
                         return;
                     }

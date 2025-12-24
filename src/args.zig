@@ -199,9 +199,7 @@ pub fn parse_args(ally: Allocator) !Args {
     defer res.deinit();
 
     // Return errors on args not yet implemented
-    if (res.args.infinite != 0 or
-        res.args.screensaver != 0)
-    {
+    if (res.args.screensaver != 0) {
         return ArgsError.NotImplemented;
     }
 
@@ -353,12 +351,9 @@ pub fn deinit(self: *Args) void {
 fn createDefaultCachePath(ally: Allocator) ![]u8 {
     if (builtin.os.tag == .windows) {
         // Windows: Use APPDATA environment variable
-        if (std.posix.getenv("APPDATA")) |appdata| {
-            const path = try std.fs.path.join(ally, &.{ appdata, "zbonsai", "zbonsai.dat" });
-            return path;
-        }
-        // Fallback for Windows if APPDATA not set
-        return try ally.dupe(u8, "zbonsai.dat");
+        const appdata = try std.process.getEnvVarOwned(ally, "APPDATA");
+        const path = try std.fs.path.join(ally, &.{ appdata, "zbonsai", "zbonsai.dat" });
+        return path;
     } else if (builtin.os.tag == .macos) {
         // macOS: Use ~/Library/Application Support/zbonsai/
         if (std.posix.getenv("HOME")) |home| {
