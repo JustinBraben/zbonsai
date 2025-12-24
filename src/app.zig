@@ -717,51 +717,56 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
 }
 
 /// Return vaxis style for color of tree parts
+/// Uses the color configuration from args:
+/// - dark_leaves / light_leaves for dying/dead branches (leaves)
+/// - dark_wood / light_wood for trunk and shoots
 inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
+    const colors = self.args.colors;
+    
     switch (branch_type) {
-        .trunk => {
-            // Brown colors for trunk with varied intensity
-            const browns = [_]u8{ 94, 130, 136, 137, 173 }; // Various brown terminal colors
-            const idx = self.dice.rollUsize(browns.len);
-            const bold = self.dice.rollI64(4) == 0; // 25% chance of bold
-
-            return vaxis.Style{
-                .fg = .{ .index = browns[idx] },
-                .bold = bold,
-            };
-        },
-        .shootLeft, .shootRight => {
-            // Lighter brown/green for shoots
-            const shoot_colors = [_]u8{ 130, 131, 136, 137, 138, 179 };
-            const idx = self.dice.rollUsize(shoot_colors.len);
-            const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
-
-            return vaxis.Style{
-                .fg = .{ .index = shoot_colors[idx] },
-                .bold = bold,
-            };
+        .trunk, .shootLeft, .shootRight => {
+            // Wood colors - 50/50 chance of light vs dark
+            if (self.dice.rollI64(2) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.light_wood },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.dark_wood },
+                    .bold = false,
+                };
+            }
         },
         .dying => {
-            // Greens for dying branches (which become leaves)
-            const greens = [_]u8{ 2, 22, 28, 34, 40, 46, 70, 76, 82, 112, 118 };
-            const idx = self.dice.rollUsize(greens.len);
-            const bold = self.dice.rollI64(3) == 0; // 33% chance of bold
-
-            return vaxis.Style{
-                .fg = .{ .index = greens[idx] },
-                .bold = bold,
-            };
+            // Dying branches use leaf colors
+            // 10% chance of bold/bright
+            if (self.dice.rollI64(10) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.light_leaves },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.light_leaves },
+                    .bold = false,
+                };
+            }
         },
         .dead => {
-            // Brighter greens for leaves
-            const leaf_greens = [_]u8{ 10, 40, 46, 47, 48, 77, 78, 82, 83, 84, 85, 119, 120 };
-            const idx = self.dice.rollUsize(leaf_greens.len);
-            const bold = self.dice.rollI64(2) == 0; // 50% chance of bold for more vibrant leaves
-
-            return vaxis.Style{
-                .fg = .{ .index = leaf_greens[idx] },
-                .bold = bold,
-            };
+            // Dead branches (final leaves)
+            // 33% chance of bold/dark leaves
+            if (self.dice.rollI64(3) == 0) {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.dark_leaves },
+                    .bold = true,
+                };
+            } else {
+                return vaxis.Style{
+                    .fg = .{ .index = colors.dark_leaves },
+                    .bold = false,
+                };
+            }
         },
     }
 }

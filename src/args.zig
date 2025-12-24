@@ -12,6 +12,9 @@ pub const ArgsError = error{
     MultiplierOutOfRange,
     InvalidSeed,
     TooManyLeaves,
+    InvalidColorValue,
+    InvalidColorCount,
+    TooManyColors,
 };
 
 pub const Verbosity = enum(u16) {
@@ -27,6 +30,15 @@ pub const BaseType = enum {
 };
 
 pub const MAX_LEAVES = 64;
+
+/// Color configuration for tree rendering
+/// Indices are terminal color codes (0-255)
+pub const ColorConfig = struct {
+    dark_leaves: u8 = 2,    // Default green
+    dark_wood: u8 = 3,      // Default dark brown/yellow
+    light_leaves: u8 = 10,  // Default bright green
+    light_wood: u8 = 11,    // Default bright brown/yellow
+};
 
 allocator: Allocator,
 
@@ -52,6 +64,9 @@ message: ?[]const u8 = null,
 leaves: []const u8 = "&", // Raw input string for leaves
 leafStrings: [MAX_LEAVES][]const u8 = undefined, // Parsed leaf options
 leafCount: usize = 0,
+
+// Color configuration
+colors: ColorConfig = .{},
 
 load: bool = false,
 save: bool = false,
@@ -84,6 +99,38 @@ pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
     }
 }
 
+/// Parse comma-delimited color string into ColorConfig
+/// Format: "dark_leaves,dark_wood,light_leaves,light_wood"
+/// Example: "2,3,10,11" (the default)
+pub fn parseColors(color_input: []const u8) ArgsError!ColorConfig {
+    var config = ColorConfig{};
+    var iter = std.mem.tokenizeScalar(u8, color_input, ',');
+    var index: usize = 0;
+
+    while (iter.next()) |color_str| {
+        const trimmed = std.mem.trim(u8, color_str, " \t");
+        const color = std.fmt.parseInt(u8, trimmed, 10) catch {
+            return ArgsError.InvalidColorValue;
+        };
+
+        switch (index) {
+            0 => config.dark_leaves = color,
+            1 => config.dark_wood = color,
+            2 => config.light_leaves = color,
+            3 => config.light_wood = color,
+            else => return ArgsError.TooManyColors,
+        }
+        index += 1;
+    }
+
+    // Must have exactly 4 colors if any are provided
+    if (index != 0 and index != 4) {
+        return ArgsError.InvalidColorCount;
+    }
+
+    return config;
+}
+
 /// Get a random leaf string for display
 pub fn getRandomLeaf(self: *const Args, index: usize) []const u8 {
     if (self.leafCount == 0) {
@@ -110,6 +157,9 @@ pub fn parse_args(ally: Allocator) !Args {
         \\-b, --base <BASETYPE>     Ascii-art plant base to use, 0 is none.
         \\-c, --leaf <STR>          List of comma-delimited strings randomly chosen
         \\                          for leaves [default: &].
+        \\-k, --color <STR>         List of 4 comma-delimited color indices (0-255) for
+        \\                          dark leaves, dark wood, light leaves, light wood
+        \\                          [default: 2,3,10,11].
         \\
         \\-M, --multiplier <USIZE>  Branch multiplier; higher -> more
         \\                          branching (0-20) [default: 5].
@@ -227,6 +277,12 @@ pub fn parse_args(ally: Allocator) !Args {
         leaves = try ally.dupe(u8, "&");
     }
 
+    // Parse colors
+    var colors = ColorConfig{};
+    if (res.args.color) |color_input| {
+        colors = try parseColors(color_input);
+    }
+
     var args = Args{
         .allocator = ally,
         .help = res.args.help != 0,
@@ -248,6 +304,8 @@ pub fn parse_args(ally: Allocator) !Args {
         .leaves = leaves,
         .leafStrings = undefined,
         .leafCount = 0,
+
+        .colors = colors,
 
         .save = save,
         .load = load,
@@ -625,4 +683,70 @@ test "createDefaultCachePath returns valid path" {
 
     // Path should contain 'zbonsai' somewhere
     try std.testing.expect(std.mem.indexOf(u8, path, "zbonsai") != null);
+}
+
+// ============================================================================
+// Color Parsing Tests
+// ============================================================================
+
+test "parseColors - default values" {
+    const config = try parseColors("");
+    
+    // When empty string passed, should return defaults
+    try std.testing.expectEqual(@as(u8, 2), config.dark_leaves);
+    try std.testing.expectEqual(@as(u8, 3), config.dark_wood);
+    try std.testing.expectEqual(@as(u8, 10), config.light_leaves);
+    try std.testing.expectEqual(@as(u8, 11), config.light_wood);
+}
+
+test "parseColors - valid 4 colors" {
+    const config = try parseColors("1,2,3,4");
+    
+    try std.testing.expectEqual(@as(u8, 1), config.dark_leaves);
+    try std.testing.expectEqual(@as(u8, 2), config.dark_wood);
+    try std.testing.expectEqual(@as(u8, 3), config.light_leaves);
+    try std.testing.expectEqual(@as(u8, 4), config.light_wood);
+}
+
+test "parseColors - with whitespace" {
+    const config = try parseColors(" 100 , 150 , 200 , 250 ");
+    
+    try std.testing.expectEqual(@as(u8, 100), config.dark_leaves);
+    try std.testing.expectEqual(@as(u8, 150), config.dark_wood);
+    try std.testing.expectEqual(@as(u8, 200), config.light_leaves);
+    try std.testing.expectEqual(@as(u8, 250), config.light_wood);
+}
+
+test "parseColors - 256 color range" {
+    const config = try parseColors("0,127,128,255");
+    
+    try std.testing.expectEqual(@as(u8, 0), config.dark_leaves);
+    try std.testing.expectEqual(@as(u8, 127), config.dark_wood);
+    try std.testing.expectEqual(@as(u8, 128), config.light_leaves);
+    try std.testing.expectEqual(@as(u8, 255), config.light_wood);
+}
+
+test "parseColors - too few colors" {
+    const result = parseColors("1,2,3");
+    try std.testing.expectError(ArgsError.InvalidColorCount, result);
+}
+
+test "parseColors - too many colors" {
+    const result = parseColors("1,2,3,4,5");
+    try std.testing.expectError(ArgsError.TooManyColors, result);
+}
+
+test "parseColors - invalid color value (not a number)" {
+    const result = parseColors("1,2,abc,4");
+    try std.testing.expectError(ArgsError.InvalidColorValue, result);
+}
+
+test "parseColors - color value out of u8 range" {
+    const result = parseColors("1,2,3,256");
+    try std.testing.expectError(ArgsError.InvalidColorValue, result);
+}
+
+test "parseColors - negative color value" {
+    const result = parseColors("1,2,-3,4");
+    try std.testing.expectError(ArgsError.InvalidColorValue, result);
 }
