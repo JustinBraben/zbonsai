@@ -78,9 +78,9 @@ const Test = struct {
             // try trace.format("", .{}, writer);
             // break :blk stream.getWritten();
 
-            const stdout_file = std.fs.File.stdout();
+            const stdout_file: std.fs.File = .stdout();
             var writer = stdout_file.writer(&self.stack_trace_buf);
-            const writer_interface: *std.io.Writer = &writer.interface;
+            const writer_interface  = &writer.interface;
             try trace.format(writer_interface);
             break :blk writer_interface.buffered();
         } else null;
@@ -168,10 +168,10 @@ pub fn main() !void {
         try tests.append(allocator, Test.init(test_fn));
     }
 
-    const stderr_file = std.fs.File.stderr();
+    const stderr_file: std.fs.File = .stderr();
     var buf: [1024]u8 = undefined;
     var stderr_writer = stderr_file.writer(&buf);
-    const stderr_writer_interface: *std.io.Writer = &stderr_writer.interface;
+    const stderr_writer_interface = &stderr_writer.interface;
 
     // Print Rust-like header
     try stderr_writer_interface.print("\nrunning {d} tests\n", .{tests.items.len});
@@ -290,13 +290,15 @@ pub fn colorize(color: std.io.tty.Color, buf: []u8, input: []const u8, is_colori
     if (!is_colorized) return input;
 
     const config: std.io.tty.Config = .escape_codes;
-    var stream = std.io.fixedBufferStream(buf);
-    const writer = stream.writer();
-    try config.setColor(writer, color);
+    // var stream = std.Io.Writer.fixed(buf);
+    // var stream = std.io.fixedBufferStream(buf);
+    var writer = std.Io.Writer.fixed(buf);
+    try config.setColor(&writer, color);
     try writer.writeAll(input);
-    try config.setColor(writer, .reset);
+    try config.setColor(&writer, .reset);
 
-    return stream.getWritten();
+    // return stream.getWritten();
+    return writer.buffer[0..writer.buffer.len];
 }
 
 // Color utility functions

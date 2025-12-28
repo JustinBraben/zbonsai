@@ -47,10 +47,10 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .root_module = exe_mod,
         // TODO: fix test_runner for new std.Io
-        // .test_runner = .{ 
-        //     .path = b.path("test/test_runner.zig"),
-        //     .mode = .simple,
-        // },
+        .test_runner = .{ 
+            .path = b.path("test/test_runner.zig"),
+            .mode = .simple,
+        },
     });
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
