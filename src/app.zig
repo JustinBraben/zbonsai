@@ -108,6 +108,9 @@ pub fn run(self: *App) !void {
                 try self.drawMessage();
                 try self.growTree(&myCounters);
                 pass_finished = true;
+                
+                // Always do a final render after tree is complete
+                try self.renderScreen();
             }
 
             if (self.args.printTree) {
@@ -170,6 +173,11 @@ pub fn run(self: *App) !void {
 
     // If -p flag passed to program, print the tree to terminal after completion
     if (self.args.printTree) {
+        // Ensure final render is complete before printing
+        try self.vx.render(self.tty.writer());
+        try self.tty.writer().flush();
+        
+        // Exit alternate screen and print the tree to normal terminal
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
     }
