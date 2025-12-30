@@ -79,6 +79,12 @@ zig build run -- -c "🌿,🍃,🌸,✿,🌺"
 zig build run -- -c "&,🌿,*,🍃"
 ```
 
+Live mode looping infinitely
+
+```
+zig build run -- -l -i
+```
+
 ## Dependencies
 
 - [libvaxis](https://github.com/libvaxis/libvaxis): A Zig library for creating terminal user interfaces
