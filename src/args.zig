@@ -198,11 +198,6 @@ pub fn parse_args(ally: Allocator) !Args {
     };
     defer res.deinit();
 
-    // Return errors on args not yet implemented
-    if (res.args.screensaver != 0) {
-        return ArgsError.NotImplemented;
-    }
-
     // Write help if -h was passed
     if (res.args.help != 0) {
         try clap.helpToFile(.stderr(), clap.Help, &params, .{});
@@ -312,6 +307,14 @@ pub fn parse_args(ally: Allocator) !Args {
         .loadFile = loadFile,
     };
 
+    // Screensaver mode: enable live, infinite, save, and load
+    if (args.screensaver) {
+        args.live = true;
+        args.infinite = true;
+        args.save = true;
+        args.load = true;
+    }
+
     // If load flag is set, try to load seed and branch count from file
     if (args.load) {
         if (loadFromFile(args.loadFile)) |loaded| {
@@ -352,6 +355,7 @@ fn createDefaultCachePath(ally: Allocator) ![]u8 {
     if (builtin.os.tag == .windows) {
         // Windows: Use APPDATA environment variable
         const appdata = try std.process.getEnvVarOwned(ally, "APPDATA");
+        defer ally.free(appdata);
         const path = try std.fs.path.join(ally, &.{ appdata, "zbonsai", "zbonsai.dat" });
         return path;
     } else if (builtin.os.tag == .macos) {

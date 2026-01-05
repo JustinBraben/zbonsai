@@ -139,7 +139,9 @@ pub fn run(self: *App) !void {
                 while (self.loop.tryEvent()) |event| {
                     switch (event) {
                         .key_press => |key| {
-                            if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
+                            // In screensaver mode, quit on any keypress
+                            // Otherwise, quit on Ctrl+C or 'q'
+                            if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                                 self.should_quit = true;
                             }
                         },
@@ -187,8 +189,9 @@ pub fn run(self: *App) !void {
 pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *bool) !void {
     switch (event) {
         .key_press => |key| {
-            // Quit on Ctrl+C or 'q'
-            if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
+            // In screensaver mode, quit on any keypress
+            // Otherwise, quit on Ctrl+C or 'q'
+            if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                 self.should_quit = true;
             }
         },
@@ -471,7 +474,9 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         while (self.loop.tryEvent()) |event| {
             switch (event) {
                 .key_press => |key| {
-                    if (key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
+                    // In screensaver mode, quit on any keypress
+                    // Otherwise, quit on Ctrl+C or 'q'
+                    if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                         self.should_quit = true;
                         return;
                     }
