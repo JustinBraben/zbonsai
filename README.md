@@ -111,7 +111,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [x] Live view of tree generating by optionally passing `-l`
 - [x] Implement message box
 - [x] Implement print to terminal on completion `-p`
-- [ ] Implement file saving and loading
+- [x] Implement file saving and loading
+- [x] Improve colour support
 - [ ] Add option to use different Random Number Generators
 - [ ] Add benchmarking/testing
 - [ ] Improve resizing 
