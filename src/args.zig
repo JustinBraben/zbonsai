@@ -32,6 +32,7 @@ pub const BaseType = enum {
 pub const MAX_LEAVES = 64;
 
 /// Color configuration for tree rendering
+/// 
 /// Indices are terminal color codes (0-255)
 pub const ColorConfig = struct {
     dark_leaves: u8 = 2,    // Default green
@@ -60,12 +61,12 @@ timeStep: f32 = 0.03,
 
 message: ?[]const u8 = null,
 
-// Leaf configuration
-leaves: []const u8 = "&", // Raw input string for leaves
-leafStrings: [MAX_LEAVES][]const u8 = undefined, // Parsed leaf options
+/// Raw input string for leaves
+leaves: []const u8 = "&",
+/// Parsed leaf options
+leafStrings: [MAX_LEAVES][]const u8 = undefined,
 leafCount: usize = 0,
 
-// Color configuration
 colors: ColorConfig = .{},
 
 load: bool = false,
@@ -75,6 +76,7 @@ saveFile: []const u8 = undefined,
 loadFile: []const u8 = undefined,
 
 /// Parse comma-delimited leaf string into individual leaf options
+/// 
 /// Example: "&,*,🌿,🍃" becomes ["&", "*", "🌿", "🍃"]
 pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
     self.leafCount = 0;
@@ -100,7 +102,9 @@ pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
 }
 
 /// Parse comma-delimited color string into ColorConfig
+/// 
 /// Format: "dark_leaves,dark_wood,light_leaves,light_wood"
+/// 
 /// Example: "2,3,10,11" (the default)
 pub fn parseColors(color_input: []const u8) ArgsError!ColorConfig {
     var config = ColorConfig{};
@@ -393,6 +397,7 @@ fn ensureParentDirExists(file_path: []const u8) !void {
 }
 
 /// Save tree state (seed and branch count) to file
+/// 
 /// Creates parent directories if they don't exist
 pub fn saveToFile(ally: Allocator, file_path: []const u8, seed: u64, branchCount: usize) !void {
     // Ensure the directory exists
@@ -408,7 +413,8 @@ pub fn saveToFile(ally: Allocator, file_path: []const u8, seed: u64, branchCount
 }
 
 /// Load tree state (seed and branch count) from file
-/// Returns error if file doesn't exist or has invalid format
+/// 
+/// Returns an error if file doesn't exist or has invalid format
 pub fn loadFromFile(file_path: []const u8) !struct { seed: u64, branchCount: usize } {
     const file = std.fs.cwd().openFile(file_path, .{}) catch |err| {
         if (err == error.FileNotFound) {

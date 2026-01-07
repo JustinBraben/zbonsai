@@ -314,13 +314,15 @@ fn drawBase(self: *App) !void {
                 \\    (_)                     (_) 
             ;
 
-            const x_pos = (win.width / 2) -| 16;
+            // Middle x position of msg
+            const x_pos_middle: u16 = ((msg.len) / 3 / 2);
+            const x_pos = (win.width / 2) -| x_pos_middle;
             const y_pos = (win.height -| 3);
 
             const pot_child = win.child(.{
                 .x_off = x_pos,
                 .y_off = y_pos,
-                .width = 33,
+                .width = ((msg.len) / 3) + 1,
                 .height = 3,
             });
 
