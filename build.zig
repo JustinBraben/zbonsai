@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .root_module = exe_mod,
         // TODO: fix test_runner for new std.Io
-        .test_runner = .{ 
+        .test_runner = .{
             .path = b.path("test/test_runner.zig"),
             .mode = .simple,
         },

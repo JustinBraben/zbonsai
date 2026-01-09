@@ -36,8 +36,8 @@ const Test = struct {
                 .ignored = std.mem.indexOf(u8, test_fn.name, "ignored") != null,
             }
         else
-            .{ 
-                .function = test_fn.func, 
+            .{
+                .function = test_fn.func,
                 .name = test_fn.name,
                 .ignored = std.mem.indexOf(u8, test_fn.name, "ignored") != null,
             };
@@ -80,7 +80,7 @@ const Test = struct {
 
             const stdout_file: std.fs.File = .stdout();
             var writer = stdout_file.writer(&self.stack_trace_buf);
-            const writer_interface  = &writer.interface;
+            const writer_interface = &writer.interface;
             try trace.format(writer_interface);
             break :blk writer_interface.buffered();
         } else null;
@@ -121,17 +121,17 @@ const Test = struct {
 
     fn printFailureDetail(self: Test, failure: Failure, writer: *std.io.Writer) !void {
         try writer.print("\nfailures:\n\n", .{});
-        
+
         // Format similar to Rust's failure output
         const full_name = if (self.module) |module|
             try std.fmt.allocPrint(std.heap.page_allocator, "{s}::{s}", .{ module, self.name })
         else
             self.name;
         defer if (self.module != null) std.heap.page_allocator.free(full_name);
-        
+
         try writer.print("---- {s} ----\n", .{full_name});
         try writer.print("Error: {s}\n", .{@errorName(failure.err)});
-        
+
         if (failure.trace) |trace| {
             try writer.print("\n{s}\n", .{trace});
         }
@@ -149,7 +149,7 @@ pub fn main() !void {
     // Parse command line arguments
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
-    
+
     var run_ignored = false;
     if (args.len > 1) {
         for (args[1..]) |arg| {
@@ -163,7 +163,7 @@ pub fn main() !void {
     // Get built-in tests
     const test_fns = builtin.test_functions;
     try tests.ensureTotalCapacity(allocator, test_fns.len);
-    
+
     for (test_fns) |test_fn| {
         try tests.append(allocator, Test.init(test_fn));
     }
@@ -199,7 +199,7 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
         }
         if (t.leaked) leaked += 1;
     }
-    
+
     // const writer = std.io.getStdErr().writer();
     var total_duration_buf: [256]u8 = undefined;
     const total_duration = try duration(
@@ -219,7 +219,7 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
             },
         }
     }
-    
+
     if (has_failures) {
         try stderr_writer_interface.print("\nfailures:\n", .{});
         for (tests) |t| {
@@ -229,7 +229,7 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
                 else
                     t.name;
                 defer if (t.module != null) std.heap.page_allocator.free(full_name);
-                
+
                 try stderr_writer_interface.print("    {s}\n", .{full_name});
             }
         }
@@ -237,15 +237,14 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
 
     // Print Rust-like summary line
     try stderr_writer_interface.print("\ntest result: ", .{});
-    
+
     if (failure == 0 and leaked == 0) {
         try stderr_writer_interface.print("{s}. ", .{green("ok")});
     } else {
         try stderr_writer_interface.print("{s}. ", .{red("FAILED")});
     }
-    
-    try stderr_writer_interface.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", 
-        .{success, failure, skipped, total_duration});
+
+    try stderr_writer_interface.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", .{ success, failure, skipped, total_duration });
 
     if (leaked > 0) {
         try stderr_writer_interface.print("\n{d} tests leaked memory\n", .{leaked});

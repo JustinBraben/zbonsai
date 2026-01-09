@@ -108,7 +108,7 @@ pub fn run(self: *App) !void {
                 try self.drawMessage();
                 try self.growTree(&myCounters);
                 pass_finished = true;
-                
+
                 // Always do a final render after tree is complete
                 try self.renderScreen();
             }
@@ -178,7 +178,7 @@ pub fn run(self: *App) !void {
         // Ensure final render is complete before printing
         try self.vx.render(self.tty.writer());
         try self.tty.writer().flush();
-        
+
         // Exit alternate screen and print the tree to normal terminal
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
@@ -384,9 +384,15 @@ fn drawMessage(self: *App) !void {
         while (index < msg.len) : (index += 30) {
             const end = index + 30;
             if (end < msg.len) {
-                _ = message_child.printSegment(.{ .text = msg[index..end] }, .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
+                _ = message_child.printSegment(
+                    .{ .text = msg[index..end] },
+                    .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) },
+                );
             } else {
-                _ = message_child.printSegment(.{ .text = msg[index..] }, .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) });
+                _ = message_child.printSegment(
+                    .{ .text = msg[index..] },
+                    .{ .col_offset = 1, .row_offset = @divFloor(@as(u16, @truncate(index)), 30) },
+                );
             }
         }
     }
@@ -783,7 +789,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
 /// - dark_wood / light_wood for trunk and shoots
 inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     const colors = self.args.colors;
-    
+
     switch (branch_type) {
         .trunk, .shootLeft, .shootRight => {
             // Wood colors - 50/50 chance of light vs dark

@@ -32,13 +32,13 @@ pub const BaseType = enum {
 pub const MAX_LEAVES = 64;
 
 /// Color configuration for tree rendering
-/// 
+///
 /// Indices are terminal color codes (0-255)
 pub const ColorConfig = struct {
-    dark_leaves: u8 = 2,    // Default green
-    dark_wood: u8 = 3,      // Default dark brown/yellow
-    light_leaves: u8 = 10,  // Default bright green
-    light_wood: u8 = 11,    // Default bright brown/yellow
+    dark_leaves: u8 = 2, // Default green
+    dark_wood: u8 = 3, // Default dark brown/yellow
+    light_leaves: u8 = 10, // Default bright green
+    light_wood: u8 = 11, // Default bright brown/yellow
 };
 
 allocator: Allocator,
@@ -76,11 +76,11 @@ saveFile: []const u8 = undefined,
 loadFile: []const u8 = undefined,
 
 /// Parse comma-delimited leaf string into individual leaf options
-/// 
+///
 /// Example: "&,*,🌿,🍃" becomes ["&", "*", "🌿", "🍃"]
 pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
     self.leafCount = 0;
-    
+
     var iter = std.mem.tokenizeScalar(u8, leaf_input, ',');
     while (iter.next()) |leaf| {
         if (self.leafCount >= MAX_LEAVES) {
@@ -93,7 +93,7 @@ pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
             self.leafCount += 1;
         }
     }
-    
+
     // If no valid leaves were parsed, use default
     if (self.leafCount == 0) {
         self.leafStrings[0] = "&";
@@ -102,9 +102,9 @@ pub fn parseLeaves(self: *Args, leaf_input: []const u8) !void {
 }
 
 /// Parse comma-delimited color string into ColorConfig
-/// 
+///
 /// Format: "dark_leaves,dark_wood,light_leaves,light_wood"
-/// 
+///
 /// Example: "2,3,10,11" (the default)
 pub fn parseColors(color_input: []const u8) ArgsError!ColorConfig {
     var config = ColorConfig{};
@@ -397,7 +397,7 @@ fn ensureParentDirExists(file_path: []const u8) !void {
 }
 
 /// Save tree state (seed and branch count) to file
-/// 
+///
 /// Creates parent directories if they don't exist
 pub fn saveToFile(ally: Allocator, file_path: []const u8, seed: u64, branchCount: usize) !void {
     // Ensure the directory exists
@@ -413,7 +413,7 @@ pub fn saveToFile(ally: Allocator, file_path: []const u8, seed: u64, branchCount
 }
 
 /// Load tree state (seed and branch count) from file
-/// 
+///
 /// Returns an error if file doesn't exist or has invalid format
 pub fn loadFromFile(file_path: []const u8) !struct { seed: u64, branchCount: usize } {
     const file = std.fs.cwd().openFile(file_path, .{}) catch |err| {
@@ -451,7 +451,7 @@ pub fn loadFromFile(file_path: []const u8) !struct { seed: u64, branchCount: usi
 
 test "parseLeaves - single leaf" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -459,16 +459,16 @@ test "parseLeaves - single leaf" {
         .leaves = try test_alloc.dupe(u8, "&"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("&");
-    
+
     try std.testing.expectEqual(@as(usize, 1), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
 }
 
 test "parseLeaves - multiple ASCII leaves" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -476,9 +476,9 @@ test "parseLeaves - multiple ASCII leaves" {
         .leaves = try test_alloc.dupe(u8, "&,*,#,@"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("&,*,#,@");
-    
+
     try std.testing.expectEqual(@as(usize, 4), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
     try std.testing.expectEqualStrings("*", args.leafStrings[1]);
@@ -488,7 +488,7 @@ test "parseLeaves - multiple ASCII leaves" {
 
 test "parseLeaves - with whitespace" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -496,9 +496,9 @@ test "parseLeaves - with whitespace" {
         .leaves = try test_alloc.dupe(u8, "& , * , #"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("& , * , #");
-    
+
     try std.testing.expectEqual(@as(usize, 3), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
     try std.testing.expectEqualStrings("*", args.leafStrings[1]);
@@ -507,7 +507,7 @@ test "parseLeaves - with whitespace" {
 
 test "parseLeaves - unicode/emoji leaves" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -515,9 +515,9 @@ test "parseLeaves - unicode/emoji leaves" {
         .leaves = try test_alloc.dupe(u8, "🌿,🍃,🌸,✿"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("🌿,🍃,🌸,✿");
-    
+
     try std.testing.expectEqual(@as(usize, 4), args.leafCount);
     try std.testing.expectEqualStrings("🌿", args.leafStrings[0]);
     try std.testing.expectEqualStrings("🍃", args.leafStrings[1]);
@@ -527,7 +527,7 @@ test "parseLeaves - unicode/emoji leaves" {
 
 test "parseLeaves - mixed ASCII and unicode" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -535,9 +535,9 @@ test "parseLeaves - mixed ASCII and unicode" {
         .leaves = try test_alloc.dupe(u8, "&,🌿,*,🍃"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("&,🌿,*,🍃");
-    
+
     try std.testing.expectEqual(@as(usize, 4), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
     try std.testing.expectEqualStrings("🌿", args.leafStrings[1]);
@@ -547,7 +547,7 @@ test "parseLeaves - mixed ASCII and unicode" {
 
 test "parseLeaves - empty input uses default" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -555,16 +555,16 @@ test "parseLeaves - empty input uses default" {
         .leaves = try test_alloc.dupe(u8, ""),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("");
-    
+
     try std.testing.expectEqual(@as(usize, 1), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
 }
 
 test "parseLeaves - only commas uses default" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -572,16 +572,16 @@ test "parseLeaves - only commas uses default" {
         .leaves = try test_alloc.dupe(u8, ",,,"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves(",,,");
-    
+
     try std.testing.expectEqual(@as(usize, 1), args.leafCount);
     try std.testing.expectEqualStrings("&", args.leafStrings[0]);
 }
 
 test "getRandomLeaf - returns valid leaves" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -589,9 +589,9 @@ test "getRandomLeaf - returns valid leaves" {
         .leaves = try test_alloc.dupe(u8, "A,B,C"),
     };
     defer args.deinit();
-    
+
     try args.parseLeaves("A,B,C");
-    
+
     // Test that getRandomLeaf wraps around properly
     try std.testing.expectEqualStrings("A", args.getRandomLeaf(0));
     try std.testing.expectEqualStrings("B", args.getRandomLeaf(1));
@@ -602,7 +602,7 @@ test "getRandomLeaf - returns valid leaves" {
 
 test "getRandomLeaf - empty leafCount returns default" {
     const test_alloc = std.testing.allocator;
-    
+
     var args = Args{
         .allocator = test_alloc,
         .saveFile = try test_alloc.dupe(u8, "test"),
@@ -611,7 +611,7 @@ test "getRandomLeaf - empty leafCount returns default" {
         .leafCount = 0, // explicitly zero
     };
     defer args.deinit();
-    
+
     try std.testing.expectEqualStrings("&", args.getRandomLeaf(0));
     try std.testing.expectEqualStrings("&", args.getRandomLeaf(100));
 }
@@ -696,7 +696,7 @@ test "createDefaultCachePath returns valid path" {
 
 test "parseColors - default values" {
     const config = try parseColors("");
-    
+
     // When empty string passed, should return defaults
     try std.testing.expectEqual(@as(u8, 2), config.dark_leaves);
     try std.testing.expectEqual(@as(u8, 3), config.dark_wood);
@@ -706,7 +706,7 @@ test "parseColors - default values" {
 
 test "parseColors - valid 4 colors" {
     const config = try parseColors("1,2,3,4");
-    
+
     try std.testing.expectEqual(@as(u8, 1), config.dark_leaves);
     try std.testing.expectEqual(@as(u8, 2), config.dark_wood);
     try std.testing.expectEqual(@as(u8, 3), config.light_leaves);
@@ -715,7 +715,7 @@ test "parseColors - valid 4 colors" {
 
 test "parseColors - with whitespace" {
     const config = try parseColors(" 100 , 150 , 200 , 250 ");
-    
+
     try std.testing.expectEqual(@as(u8, 100), config.dark_leaves);
     try std.testing.expectEqual(@as(u8, 150), config.dark_wood);
     try std.testing.expectEqual(@as(u8, 200), config.light_leaves);
@@ -724,7 +724,7 @@ test "parseColors - with whitespace" {
 
 test "parseColors - 256 color range" {
     const config = try parseColors("0,127,128,255");
-    
+
     try std.testing.expectEqual(@as(u8, 0), config.dark_leaves);
     try std.testing.expectEqual(@as(u8, 127), config.dark_wood);
     try std.testing.expectEqual(@as(u8, 128), config.light_leaves);
