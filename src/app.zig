@@ -222,7 +222,7 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
     // Check for events during sleep to allow quitting
     const check_interval_ms: u64 = 10; // Check every 10ms for responsive quit
     var waited: u64 = 0;
-    
+
     // In order to quit while live viewing
     while (waited < ms and !self.should_quit) {
         // Process any pending events
@@ -237,7 +237,7 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
                 else => {},
             }
         }
-        
+
         if (!self.should_quit) {
             const sleep_time: u64 = @min(check_interval_ms, ms - waited);
             std.Thread.sleep(sleep_time * std.time.ns_per_ms);

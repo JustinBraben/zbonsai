@@ -12,7 +12,7 @@ const Test = struct {
     result: Result = .success,
     stack_trace_buf: [8192]u8 = undefined,
     duration: usize = 0,
-    ignored: bool = false, // Add a field to track if a test is ignored
+    ignored: bool = false,
 
     pub const TestFn = *const fn () anyerror!void;
     pub const Result = union(enum) {
@@ -32,7 +32,6 @@ const Test = struct {
                 .function = test_fn.func,
                 .module = test_fn.name[0..index],
                 .name = test_fn.name[index + ".test.".len ..],
-                // Check if test name contains "ignored" or has an @ignore attribute
                 .ignored = std.mem.indexOf(u8, test_fn.name, "ignored") != null,
             }
         else
@@ -44,7 +43,6 @@ const Test = struct {
     }
 
     pub fn run(self: *Test, allocator: std.mem.Allocator, run_ignored: bool) !void {
-        // Skip ignored tests unless specifically requested to run them
         if (self.ignored and !run_ignored) {
             self.result = .skipped;
             return;
@@ -73,11 +71,6 @@ const Test = struct {
 
     fn formatStackTrace(self: *Test, maybe_trace: ?*std.builtin.StackTrace) !?[]const u8 {
         return if (maybe_trace) |trace| blk: {
-            // var stream = std.io.fixedBufferStream(&self.stack_trace_buf);
-            // const writer = stream.writer();
-            // try trace.format("", .{}, writer);
-            // break :blk stream.getWritten();
-
             const stdout_file: std.fs.File = .stdout();
             var writer = stdout_file.writer(&self.stack_trace_buf);
             const writer_interface = &writer.interface;
@@ -86,15 +79,7 @@ const Test = struct {
         } else null;
     }
 
-    pub fn print(self: Test, writer: *std.io.Writer) !void {
-        // const writer = stream.writer();
-
-        // const stdout_file = std.fs.File.stdout();
-        // var writer = stdout_file.writer(&self.stack_trace_buf);
-        // const writer_interface: *std.io.Writer = &writer.interface;
-        // try trace.format(writer_interface);
-
-        // Format test name like "module::name"
+    pub fn print(self: Test, writer: *std.Io.Writer) !void {
         const full_name = if (self.module) |module|
             try std.fmt.allocPrint(std.heap.page_allocator, "{s}::{s}", .{ module, self.name })
         else
@@ -117,12 +102,12 @@ const Test = struct {
         }
 
         try writer.writeByte('\n');
+        try writer.flush();
     }
 
-    fn printFailureDetail(self: Test, failure: Failure, writer: *std.io.Writer) !void {
+    fn printFailureDetail(self: Test, failure: Failure, writer: *std.Io.Writer) !void {
         try writer.print("\nfailures:\n\n", .{});
 
-        // Format similar to Rust's failure output
         const full_name = if (self.module) |module|
             try std.fmt.allocPrint(std.heap.page_allocator, "{s}::{s}", .{ module, self.name })
         else
@@ -135,6 +120,7 @@ const Test = struct {
         if (failure.trace) |trace| {
             try writer.print("\n{s}\n", .{trace});
         }
+        try writer.flush();
     }
 };
 
@@ -168,24 +154,26 @@ pub fn main() !void {
         try tests.append(allocator, Test.init(test_fn));
     }
 
+    // Use new std.Io writer with larger buffer
     const stderr_file: std.fs.File = .stderr();
-    var buf: [1024]u8 = undefined;
+    var buf: [8192]u8 = undefined; // Increased buffer size
     var stderr_writer = stderr_file.writer(&buf);
-    const stderr_writer_interface = &stderr_writer.interface;
+    const writer = &stderr_writer.interface;
 
     // Print Rust-like header
-    try stderr_writer_interface.print("\nrunning {d} tests\n", .{tests.items.len});
+    try writer.print("\nrunning {d} tests\n", .{tests.items.len});
+    try writer.flush();
 
     // Run and print tests in Rust style
     for (tests.items) |*current_test| {
         try current_test.run(allocator, run_ignored);
-        try current_test.print(&stderr_writer.interface);
+        try current_test.print(writer);
     }
 
-    try printSummary(tests.items, start, stderr_writer_interface);
+    try printSummary(tests.items, start, writer);
 }
 
-fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.io.Writer) !void {
+fn printSummary(tests: []const Test, start: i128, writer: *std.Io.Writer) !void {
     var success: usize = 0;
     var failure: usize = 0;
     var leaked: usize = 0;
@@ -200,7 +188,6 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
         if (t.leaked) leaked += 1;
     }
 
-    // const writer = std.io.getStdErr().writer();
     var total_duration_buf: [1024]u8 = undefined;
     const total_duration = try duration(
         &total_duration_buf,
@@ -215,13 +202,13 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
             .success, .skipped => {},
             .failure => |capture| {
                 if (!has_failures) has_failures = true;
-                try t.printFailureDetail(capture, stderr_writer_interface);
+                try t.printFailureDetail(capture, writer);
             },
         }
     }
 
     if (has_failures) {
-        try stderr_writer_interface.print("\nfailures:\n", .{});
+        try writer.print("\nfailures:\n", .{});
         for (tests) |t| {
             if (t.result == .failure) {
                 const full_name = if (t.module) |module|
@@ -230,30 +217,28 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
                     t.name;
                 defer if (t.module != null) std.heap.page_allocator.free(full_name);
 
-                try stderr_writer_interface.print("    {s}\n", .{full_name});
+                try writer.print("    {s}\n", .{full_name});
             }
         }
+        try writer.flush();
     }
 
     // Print Rust-like summary line
-    try stderr_writer_interface.print("\ntest result: ", .{});
+    try writer.print("\ntest result: ", .{});
 
     if (failure == 0 and leaked == 0) {
-        try stderr_writer_interface.print("{s}. ", .{green("ok")});
+        try writer.print("{s}. ", .{green("ok")});
     } else {
-        try stderr_writer_interface.print("{s}. ", .{red("FAILED")});
+        try writer.print("{s}. ", .{red("FAILED")});
     }
 
-    try stderr_writer_interface.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", .{ success, failure, skipped, total_duration });
+    try writer.print("{d} passed; {d} failed; {d} ignored; 0 measured; 0 filtered out; finished in {s}\n\n", .{ success, failure, skipped, total_duration });
 
     if (leaked > 0) {
-        try stderr_writer_interface.print("\n{d} tests leaked memory\n", .{leaked});
+        try writer.print("\n{d} tests leaked memory\n", .{leaked});
     }
 
-    // TODO: Doc-tests section like in Rust
-    // try writer.print("   Doc-tests\n\n", .{});
-    // try writer.print("running 0 tests\n\n", .{});
-    // try writer.print("test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n", .{});
+    try writer.flush();
 
     if (failure == 0 and leaked == 0) {
         std.process.exit(0);
@@ -262,7 +247,7 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
     }
 }
 
-fn indent(message: []const u8, comptime indent_sequence: []const u8, writer: anytype) !void {
+fn indent(message: []const u8, comptime indent_sequence: []const u8, writer: *std.Io.Writer) !void {
     var it = std.mem.tokenizeScalar(u8, message, '\n');
     var color: ?[]const u8 = null;
 
@@ -289,14 +274,11 @@ pub fn colorize(color: std.io.tty.Color, buf: []u8, input: []const u8, is_colori
     if (!is_colorized) return input;
 
     const config: std.io.tty.Config = .escape_codes;
-    // var stream = std.Io.Writer.fixed(buf);
-    // var stream = std.io.fixedBufferStream(buf);
     var writer = std.Io.Writer.fixed(buf);
     try config.setColor(&writer, color);
     try writer.writeAll(input);
     try config.setColor(&writer, .reset);
 
-    // return stream.getWritten();
     return writer.buffer[0..writer.buffer.len];
 }
 
