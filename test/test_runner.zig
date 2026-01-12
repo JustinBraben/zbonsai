@@ -1,4 +1,4 @@
-//! test_runner.zig
+//! test/test_runner.zig
 //! Credit `jetzig` for this test_runner code
 
 const std = @import("std");
@@ -201,7 +201,7 @@ fn printSummary(tests: []const Test, start: i128, stderr_writer_interface: *std.
     }
 
     // const writer = std.io.getStdErr().writer();
-    var total_duration_buf: [256]u8 = undefined;
+    var total_duration_buf: [1024]u8 = undefined;
     const total_duration = try duration(
         &total_duration_buf,
         @intCast(std.time.nanoTimestamp() - start),
@@ -331,7 +331,7 @@ pub const codes = .{
     .reset = "0m",
 };
 
-pub fn duration(buf: *[256]u8, delta: i64, is_colorized: bool) ![]const u8 {
+pub fn duration(buf: *[1024]u8, delta: i64, is_colorized: bool) ![]const u8 {
     if (!is_colorized) {
         return try std.fmt.bufPrint(
             buf,
@@ -346,7 +346,7 @@ pub fn duration(buf: *[256]u8, delta: i64, is_colorized: bool) ![]const u8 {
         .yellow
     else
         .red;
-    var duration_buf: [256]u8 = undefined;
+    var duration_buf: [8192]u8 = undefined;
     const formatted_duration = try std.fmt.bufPrint(
         &duration_buf,
         "{D}",

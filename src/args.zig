@@ -1,4 +1,4 @@
-//! args.zig
+//! src/args.zig
 const std = @import("std");
 const builtin = @import("builtin");
 const io = std.io;
@@ -147,11 +147,10 @@ pub fn parse_args(ally: Allocator) !Args {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help                Display this help and exit.
         \\-l, --live                Live mode: show each step of growth
-        \\-t, --time <TIME>         In Live mode, wait TIME secs between
+        \\-t, --time <TIME>         In Live mode, wait TIME(f32) secs between
         \\                          steps of growth (must be larger than 0) [default: 0.03].
-        \\
         \\-i, --infinite            Infinite mode: keep growing trees.
-        \\-w, --wait <TIME>         In infinite mode, wait TIME between each tree
+        \\-w, --wait <TIME>         In infinite mode, wait TIME(f32) between each tree
         \\                          generation [default: 4.00].
         \\
         \\-S, --screensaver         Screensaver mode; equivalent to -li and
@@ -204,7 +203,10 @@ pub fn parse_args(ally: Allocator) !Args {
 
     // Write help if -h was passed
     if (res.args.help != 0) {
-        try clap.helpToFile(.stderr(), clap.Help, &params, .{});
+        try clap.helpToFile(.stderr(), clap.Help, &params, .{
+            // .description_indent = 4,
+            .spacing_between_parameters = 0,
+        });
     }
 
     var multiplier: usize = 5;

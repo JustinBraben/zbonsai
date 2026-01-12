@@ -1,4 +1,4 @@
-//! app.zig
+//! src/app.zig
 const std = @import("std");
 const testing = std.testing;
 const mem = std.mem;
@@ -218,7 +218,32 @@ pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *b
 pub fn updateScreen(self: *App, timeStep: f32) !void {
     try self.renderScreen();
     const ms: u64 = @intFromFloat(timeStep * std.time.ms_per_s);
-    std.Thread.sleep(ms * std.time.ns_per_ms);
+
+    // Check for events during sleep to allow quitting
+    const check_interval_ms: u64 = 10; // Check every 10ms for responsive quit
+    var waited: u64 = 0;
+    
+    // In order to quit while live viewing
+    while (waited < ms and !self.should_quit) {
+        // Process any pending events
+        while (self.loop.tryEvent()) |event| {
+            switch (event) {
+                .key_press => |key| {
+                    if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
+                        self.should_quit = true;
+                        return;
+                    }
+                },
+                else => {},
+            }
+        }
+        
+        if (!self.should_quit) {
+            const sleep_time: u64 = @min(check_interval_ms, ms - waited);
+            std.Thread.sleep(sleep_time * std.time.ns_per_ms);
+            waited += sleep_time;
+        }
+    }
 }
 
 // Render the application to the screen

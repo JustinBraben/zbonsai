@@ -1,4 +1,4 @@
-//! dice.zig
+//! src/dice.zig
 const std = @import("std");
 const Random = std.Random;
 const testing = std.testing;

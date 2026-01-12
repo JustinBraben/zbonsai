@@ -1,3 +1,5 @@
+//! build.zig
+
 const std = @import("std");
 
 // Although this function looks imperative, note that its job is to
