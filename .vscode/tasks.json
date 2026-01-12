@@ -10,6 +10,18 @@
             ],
             "problemMatcher": [],
             "group": "build"
+        },
+        {
+            "label": "build_test",
+            "type": "shell",
+            "command": "zig",
+            "args": [
+                 "build",
+                "install",
+                "--summary",
+                "all"
+            ],
+            "group": "test"
         }
     ]
 }

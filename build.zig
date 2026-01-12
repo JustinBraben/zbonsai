@@ -54,6 +54,7 @@ pub fn build(b: *std.Build) void {
             .mode = .simple,
         },
     });
+    b.installArtifact(unit_tests);
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
 
