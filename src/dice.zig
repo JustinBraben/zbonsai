@@ -6,36 +6,34 @@ const testing = std.testing;
 /// Object used to generate Random numbers for the main App
 const Dice = @This();
 
-rand: Random.Xoshiro256,
+prng: Random.DefaultPrng,
 
 /// Initialize Dice
 /// If null is passed, create seed based on timestamp
 pub fn init(seed: ?u64) Dice {
+    var self: Dice = undefined;
     if (seed) |s| {
-        return .{
-            .rand = Random.DefaultPrng.init(s),
-        };
+        self.prng = .init(s);
     } else {
         const timestamp = @as(u64, @intCast(std.time.timestamp()));
-        return .{
-            .rand = Random.DefaultPrng.init(timestamp),
-        };
+        self.prng = .init(timestamp);
     }
+    return self;
 }
 
 /// Roll the dice for a usize
 pub fn rollUsize(self: *Dice, less_than: usize) usize {
-    return self.rand.random().intRangeLessThan(usize, 0, less_than);
+    return self.prng.random().intRangeLessThan(usize, 0, less_than);
 }
 
 /// Roll the dice for an i64
 pub fn rollI64(self: *Dice, less_than: i64) i64 {
-    return self.rand.random().intRangeLessThan(i64, 0, less_than);
+    return self.prng.random().intRangeLessThan(i64, 0, less_than);
 }
 
 /// Roll the fice for an f32
 pub fn rollF32(self: *Dice) f32 {
-    return self.rand.random().float(f32);
+    return self.prng.random().float(f32);
 }
 
 /// Function for testing
