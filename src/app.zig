@@ -90,17 +90,12 @@ pub fn run(self: *App) !void {
 
         // Inner loop - grows a single tree
         while (!self.should_quit) {
-            // pollEvent blocks until we have an event
-            self.loop.pollEvent();
             // tryEvent returns events if one is available
-            // does not block
             while (self.loop.tryEvent()) |event| {
                 try self.update(event, &myCounters, &pass_finished);
             }
 
-            // Resets window, draws the base of the tree
-            // then grows the tree. If -l passed it you will view
-            // generation live. Once the tree has finished growing it will no longer draw anymore
+            // Grow the tree
             if (!pass_finished) {
                 const win = self.vx.window();
                 win.clear();
@@ -108,15 +103,6 @@ pub fn run(self: *App) !void {
                 try self.drawMessage();
                 try self.growTree(&myCounters);
                 pass_finished = true;
-
-                // Always do a final render after tree is complete
-                try self.renderScreen();
-            }
-
-            if (self.args.printTree) {
-                self.should_quit = true;
-            } else {
-                try self.renderScreen();
             }
 
             // Tree finished growing, break inner loop
@@ -131,16 +117,13 @@ pub fn run(self: *App) !void {
         // In infinite mode: wait for timeWait seconds, checking for quit
         if (!self.should_quit) {
             const wait_ms: u64 = @intFromFloat(self.args.timeWait * std.time.ms_per_s);
-            const check_interval_ms: u64 = 100; // Check for input every 100ms
+            const check_interval_ms: u64 = 100;
             var waited: u64 = 0;
 
             while (waited < wait_ms and !self.should_quit) {
-                // Check for key events during wait
                 while (self.loop.tryEvent()) |event| {
                     switch (event) {
                         .key_press => |key| {
-                            // In screensaver mode, quit on any keypress
-                            // Otherwise, quit on Ctrl+C or 'q'
                             if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
                                 self.should_quit = true;
                             }
@@ -155,11 +138,10 @@ pub fn run(self: *App) !void {
                 }
             }
 
-            // Generate new seed for next tree
             if (!self.should_quit) {
                 const new_seed = @as(u64, @intCast(std.time.timestamp()));
                 self.dice = Dice.init(new_seed);
-                myCounters = .{}; // Reset counters for new tree
+                myCounters = .{};
             }
         }
     }
@@ -173,13 +155,12 @@ pub fn run(self: *App) !void {
         }
     }
 
-    // If -p flag passed to program, print the tree to terminal after completion
-    if (self.args.printTree) {
-        // Ensure final render is complete before printing
-        try self.vx.render(self.tty.writer());
-        try self.tty.writer().flush();
+    // Drain any pending events/responses from terminal
+    self.loop.pollEvent();
 
-        // Exit alternate screen and print the tree to normal terminal
+    // Handle print mode - no alt screen, just direct output
+    if (self.args.printTree) {
+        // std.debug.print("Window size: {}x{}\n", .{self.vx.window().width, self.vx.window().height});
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
     }
