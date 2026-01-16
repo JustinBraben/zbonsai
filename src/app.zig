@@ -156,10 +156,12 @@ pub fn run(self: *App) !void {
     }
 
     // Drain any pending events/responses from terminal
-    self.loop.pollEvent();
+    // TODO: Much worse response time on macos-aarch64, sleep for now
+    // self.loop.pollEvent();
 
     // Handle print mode - no alt screen, just direct output
     if (self.args.printTree) {
+        std.Thread.sleep(100 * std.time.ns_per_ms);
         // std.debug.print("Window size: {}x{}\n", .{self.vx.window().width, self.vx.window().height});
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
