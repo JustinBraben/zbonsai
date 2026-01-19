@@ -470,7 +470,7 @@ fn growTree(self: *App, myCounters: *Counters) !void {
     try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
 
     const win = self.vx.window();
-    win.hideCursor();
+    if (win.screen.cursor_vis) win.hideCursor();
 }
 
 /// Recursively draws the parts of the tree

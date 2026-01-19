@@ -79,6 +79,12 @@ zig build run -- -c "🌿,🍃,🌸,✿,🌺"
 zig build run -- -c "&,🌿,*,🍃"
 ```
 
+Custom colours (cherry blossom)
+
+```
+zbonsai -p -k "175,94,218,137"
+```
+
 Live mode looping infinitely
 
 ```
