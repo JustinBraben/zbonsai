@@ -161,10 +161,10 @@ pub fn run(self: *App) !void {
 
     // Handle print mode - no alt screen, just direct output
     if (self.args.printTree) {
-        std.Thread.sleep(100 * std.time.ns_per_ms);
         // std.debug.print("Window size: {}x{}\n", .{self.vx.window().width, self.vx.window().height});
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
+        std.Thread.sleep(20 * std.time.ns_per_ms);
     }
 }
 
@@ -464,7 +464,7 @@ fn growTree(self: *App, myCounters: *Counters) !void {
 
     myCounters.*.shoots = 0;
     myCounters.*.branches = 0;
-    myCounters.*.shootCounter = self.dice.rollUsize(std.math.maxInt(u31));
+    myCounters.*.shootCounter = self.dice.rollUsize(std.math.maxInt(u3));
 
     // recursively grow tree trunk and branches
     try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
