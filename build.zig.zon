@@ -2,7 +2,7 @@
     .name = .zbonsai,
     .fingerprint = 0x4eeccbf5d6ffbaed,
     .version = "0.1.0",
-    .minimum_zig_version = "0.15.1",
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .vaxis = .{
             .url = "git+https://github.com/rockorager/libvaxis.git#7111c3045f156377001e2ff9e68ffdda53e0a1ae",

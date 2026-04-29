@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(\"c:\\\\Users\\\\Justin\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\globalStorage\\\\ziglang.vscode-zig\\\\zig\\\\x86_64-windows-0.16.0\\\\zig.exe\" run:*)",
+      "Bash(\"c:\\\\Users\\\\Justin\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\globalStorage\\\\ziglang.vscode-zig\\\\zig\\\\x86_64-windows-0.16.0\\\\zig.exe\" build:*)"
+    ]
+  }
+}

@@ -3,7 +3,6 @@ const std = @import("std");
 const testing = std.testing;
 const mem = std.mem;
 const Allocator = mem.Allocator;
-const io = std.io;
 
 const Args = @import("args.zig");
 const BaseType = Args.BaseType;
@@ -47,6 +46,8 @@ tty: vaxis.Tty,
 /// The vaxis instance
 vx: vaxis.Vaxis,
 loop: vaxis.Loop(Event),
+/// io handle for I/O operations (sleep, clock, files)
+io: std.Io,
 /// Roll the dice for Random number generator
 dice: Dice,
 /// Arguments passed in from command line
@@ -61,7 +62,8 @@ pub fn init(init_proc: std.process.Init, allocator: Allocator, args: *const Args
         .tty = try vaxis.Tty.init(init_proc.io, buffer),
         .vx = try vaxis.init(init_proc.io, allocator, init_proc.environ_map, .{}),
         .loop = undefined,
-        .dice = Dice.init(init_proc, args.seed),
+        .io = init_proc.io,
+        .dice = Dice.init(args.seed.?),
         .args = args,
     };
 }
@@ -122,7 +124,7 @@ pub fn run(self: *App, init_proc: std.process.Init) !void {
             var waited: u64 = 0;
 
             while (waited < wait_ms and !self.should_quit) {
-                while (self.loop.tryEvent()) |event| {
+                while (try self.loop.tryEvent()) |event| {
                     switch (event) {
                         .key_press => |key| {
                             if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
@@ -134,13 +136,13 @@ pub fn run(self: *App, init_proc: std.process.Init) !void {
                 }
 
                 if (!self.should_quit) {
-                    std.Thread.sleep(check_interval_ms * std.time.ns_per_ms);
+                    std.Io.sleep(self.io, std.Io.Duration.fromMilliseconds(check_interval_ms), .real) catch {};
                     waited += check_interval_ms;
                 }
             }
 
             if (!self.should_quit) {
-                const new_seed = @as(u64, @intCast(std.time.timestamp()));
+                const new_seed = @as(u64, @intCast(std.Io.Clock.real.now(self.io).toSeconds()));
                 self.dice = Dice.init(new_seed);
                 myCounters = .{};
             }
@@ -150,7 +152,7 @@ pub fn run(self: *App, init_proc: std.process.Init) !void {
     // Save tree state if --save flag was passed
     if (self.args.save) {
         if (self.args.seed) |seed| {
-            Args.saveToFile(self.allocator, self.args.saveFile, seed, myCounters.branches) catch |err| {
+            Args.saveToFile(self.io, self.allocator, self.args.saveFile, seed, myCounters.branches) catch |err| {
                 std.debug.print("Warning: Could not save to {s}: {}\n", .{ self.args.saveFile, err });
             };
         }
@@ -165,7 +167,7 @@ pub fn run(self: *App, init_proc: std.process.Init) !void {
         // std.debug.print("Window size: {}x{}\n", .{self.vx.window().width, self.vx.window().height});
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
-        std.Thread.sleep(20 * std.time.ns_per_ms);
+        std.Io.sleep(self.io, std.Io.Duration.fromMilliseconds(20), .real) catch {};
     }
 }
 
@@ -199,7 +201,7 @@ pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *b
 }
 
 // Update screen for live view
-pub fn updateScreen(self: *App, timeStep: f32) !void {
+pub fn updateScreen(self: *App, io: std.Io, timeStep: f32) !void {
     try self.renderScreen();
     const ms: u64 = @intFromFloat(timeStep * std.time.ms_per_s);
 
@@ -224,7 +226,8 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
 
         if (!self.should_quit) {
             const sleep_time: u64 = @min(check_interval_ms, ms - waited);
-            std.Thread.sleep(sleep_time * std.time.ns_per_ms);
+            // std.Thread.sleep(sleep_time * std.time.ns_per_ms);
+            try io.sleep(.fromMilliseconds(@as(i64, @intCast(sleep_time))), .awake);
             waited += sleep_time;
         }
     }
@@ -625,7 +628,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
         // if live, update screen
         // skip updating if we're still loading from file
         if (self.args.live and !(self.args.load and myCounters.*.branches < self.args.targetBranchCount)) {
-            try self.updateScreen(self.args.timeStep);
+            try self.updateScreen(self.io, self.args.timeStep);
         }
     }
 }
