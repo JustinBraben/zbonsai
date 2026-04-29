@@ -8,17 +8,9 @@ const Dice = @This();
 
 prng: Random.DefaultPrng,
 
-/// Initialize Dice
-/// If null is passed, create seed based on timestamp
-pub fn init(seed: ?u64) Dice {
-    var self: Dice = undefined;
-    if (seed) |s| {
-        self.prng = .init(s);
-    } else {
-        const timestamp = @as(u64, @intCast(std.time.timestamp()));
-        self.prng = .init(timestamp);
-    }
-    return self;
+/// Initialize Dice with a u64 seed
+pub fn init(seed: u64) Dice {
+    return .{ .prng = .init(seed) };
 }
 
 /// Roll the dice for a usize
@@ -42,7 +34,7 @@ fn rollI64WithinBounds(actual: i64, lower: i64, upper: i64) bool {
 }
 
 test "Dice rolls" {
-    var dice = Dice.init(null);
+    var dice = Dice.init(0);
 
     const roll_1 = dice.rollI64(10);
     const roll_2 = dice.rollI64(10);
@@ -60,7 +52,6 @@ test "Dice rolls" {
 test "Dice initialization with seed produces deterministic results" {
     var dice1 = Dice.init(12345);
     var dice2 = Dice.init(12345);
-
     try testing.expectEqual(dice1.rollUsize(100), dice2.rollUsize(100));
     try testing.expectEqual(dice1.rollI64(100), dice2.rollI64(100));
 }

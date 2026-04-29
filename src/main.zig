@@ -6,10 +6,10 @@ const Allocator = mem.Allocator;
 const Args = @import("args.zig");
 const App = @import("app.zig");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.c_allocator;
 
-    var args = try Args.parse_args(allocator);
+    var args = try Args.parse_args(init, allocator);
     defer args.deinit();
 
     // If -h was passed help will be displayed
@@ -20,7 +20,7 @@ pub fn main() !void {
 
     // Initialize our application
     var buffer: [1024]u8 = undefined;
-    var app = try App.init(allocator, &args, &buffer);
+    var app = try App.init(init, allocator, &args, &buffer);
     defer app.deinit();
 
     // Run the application
