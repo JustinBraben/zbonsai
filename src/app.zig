@@ -73,14 +73,15 @@ pub fn deinit(self: *App) void {
     self.tty.deinit();
 }
 
-pub fn run(self: *App, init_proc: std.process.Init) !void {
+pub fn run(self: *App) !void {
     // self.loop = .{
     //     .tty = &self.tty,
     //     .vaxis = &self.vx,
     // };
     // try self.loop.init();
-    self.loop = .init(init_proc.io, &self.tty, &self.vx);
+    self.loop = .init(self.io, &self.tty, &self.vx);
     try self.loop.start();
+    defer self.loop.stop();
 
     try self.vx.enterAltScreen(self.tty.writer());
     try self.vx.queryTerminal(self.tty.writer(), .fromSeconds(1));

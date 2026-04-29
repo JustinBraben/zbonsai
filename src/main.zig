@@ -24,7 +24,7 @@ pub fn main(init: std.process.Init) !void {
     defer app.deinit();
 
     // Run the application
-    try app.run(init);
+    try app.run();
 }
 
 test "Main - run all tests" {
