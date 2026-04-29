@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.15.1",
     .dependencies = .{
         .vaxis = .{
-            .url = "git+https://github.com/rockorager/libvaxis.git#5915f33c1a7a184d3fb2aa39f087c1e6864a4308",
-            .hash = "vaxis-0.5.1-BWNV_GMyCQBtxcEkSAEb_EXbm8A24FWJFC7fXiWUVx9Y",
+            .url = "git+https://github.com/rockorager/libvaxis.git#7111c3045f156377001e2ff9e68ffdda53e0a1ae",
+            .hash = "vaxis-0.6.0-BWNV_D7TCQBMZVGajzuGrcl8YvhLpOF7D_qHWWSeOPeR",
         },
         .clap = .{
-            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.11.0.tar.gz",
-            .hash = "clap-0.11.0-oBajB-HnAQDPCKYzwF7rO3qDFwRcD39Q0DALlTSz5H7e",
+            .url = "https://github.com/Hejsil/zig-clap/archive/refs/tags/0.12.0.tar.gz",
+            .hash = "clap-0.12.0-oBajB7foAQDqlSwaSG5g0yq7xGbQARUsBk5T64gAOqP5",
         },
     },
     .paths = .{

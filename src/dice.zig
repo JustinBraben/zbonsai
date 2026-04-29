@@ -10,12 +10,12 @@ prng: Random.DefaultPrng,
 
 /// Initialize Dice
 /// If null is passed, create seed based on timestamp
-pub fn init(seed: ?u64) Dice {
+pub fn init(init_proc: std.process.Init, seed: ?u64) Dice {
     var self: Dice = undefined;
     if (seed) |s| {
         self.prng = .init(s);
     } else {
-        const timestamp = @as(u64, @intCast(std.time.timestamp()));
+        const timestamp = @as(u64, @intCast(std.Io.Clock.real.now(init_proc.io).nanoseconds));
         self.prng = .init(timestamp);
     }
     return self;

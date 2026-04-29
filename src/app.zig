@@ -54,14 +54,14 @@ args: *const Args,
 debug_buffer: [512]u8 = undefined,
 initial_resize_handled: bool = false,
 
-pub fn init(allocator: Allocator, args: *const Args, buffer: []u8) !App {
+pub fn init(init_proc: std.process.Init, allocator: Allocator, args: *const Args, buffer: []u8) !App {
     return .{
         .allocator = allocator,
         .should_quit = false,
-        .tty = try vaxis.Tty.init(buffer),
-        .vx = try vaxis.init(allocator, .{}),
+        .tty = try vaxis.Tty.init(init_proc.io, buffer),
+        .vx = try vaxis.init(init_proc.io, allocator, init_proc.environ_map, .{}),
         .loop = undefined,
-        .dice = Dice.init(args.seed),
+        .dice = Dice.init(init_proc, args.seed),
         .args = args,
     };
 }
@@ -71,16 +71,17 @@ pub fn deinit(self: *App) void {
     self.tty.deinit();
 }
 
-pub fn run(self: *App) !void {
-    self.loop = .{
-        .tty = &self.tty,
-        .vaxis = &self.vx,
-    };
-    try self.loop.init();
+pub fn run(self: *App, init_proc: std.process.Init) !void {
+    // self.loop = .{
+    //     .tty = &self.tty,
+    //     .vaxis = &self.vx,
+    // };
+    // try self.loop.init();
+    self.loop = .init(init_proc.io, &self.tty, &self.vx);
     try self.loop.start();
 
     try self.vx.enterAltScreen(self.tty.writer());
-    try self.vx.queryTerminal(self.tty.writer(), 1 * std.time.ns_per_s);
+    try self.vx.queryTerminal(self.tty.writer(), .fromSeconds(1));
 
     var myCounters: Counters = .{};
 
@@ -91,7 +92,7 @@ pub fn run(self: *App) !void {
         // Inner loop - grows a single tree
         while (!self.should_quit) {
             // tryEvent returns events if one is available
-            while (self.loop.tryEvent()) |event| {
+            while (try self.loop.tryEvent()) |event| {
                 try self.update(event, &myCounters, &pass_finished);
             }
 
@@ -209,7 +210,7 @@ pub fn updateScreen(self: *App, timeStep: f32) !void {
     // In order to quit while live viewing
     while (waited < ms and !self.should_quit) {
         // Process any pending events
-        while (self.loop.tryEvent()) |event| {
+        while (try self.loop.tryEvent()) |event| {
             switch (event) {
                 .key_press => |key| {
                     if (self.args.screensaver or key.matches('c', .{ .ctrl = true }) or key.matches('q', .{})) {
@@ -487,7 +488,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
 
     while (life > 0) {
         // tryEvent returns events until the queue is empty
-        while (self.loop.tryEvent()) |event| {
+        while (try self.loop.tryEvent()) |event| {
             switch (event) {
                 .key_press => |key| {
                     // In screensaver mode, quit on any keypress
