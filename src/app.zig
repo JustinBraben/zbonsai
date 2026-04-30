@@ -74,11 +74,6 @@ pub fn deinit(self: *App) void {
 }
 
 pub fn run(self: *App) !void {
-    // self.loop = .{
-    //     .tty = &self.tty,
-    //     .vaxis = &self.vx,
-    // };
-    // try self.loop.init();
     self.loop = .init(self.io, &self.tty, &self.vx);
     try self.loop.start();
     defer self.loop.stop();
