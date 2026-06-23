@@ -142,7 +142,7 @@ pub fn getRandomLeaf(self: *const Args, index: usize) []const u8 {
     return self.leafStrings[index % self.leafCount];
 }
 
-pub fn parse_args(init: std.process.Init, ally: Allocator) !Args {
+pub fn parseArgs(init: std.process.Init, ally: Allocator) !Args {
     const params = comptime clap.parseParamsComptime(
         \\-h, --help                Display this help and exit.
         \\-l, --live                Live mode: show each step of growth
@@ -203,7 +203,6 @@ pub fn parse_args(init: std.process.Init, ally: Allocator) !Args {
     // Write help if -h was passed
     if (res.args.help != 0) {
         try clap.helpToFile(init.io, .stderr(), clap.Help, &params, .{
-            // .description_indent = 4,
             .spacing_between_parameters = 0,
         });
     }
@@ -396,8 +395,7 @@ fn ensureParentDirExists(io: std.Io, file_path: []const u8) !void {
 /// Save tree state (seed and branch count) to file
 ///
 /// Creates parent directories if they don't exist
-pub fn saveToFile(io: std.Io, ally: Allocator, file_path: []const u8, seed: u64, branchCount: usize) !void {
-    _ = ally;
+pub fn saveToFile(io: std.Io, file_path: []const u8, seed: u64, branchCount: usize) !void {
     // Ensure the directory exists
     try ensureParentDirExists(io, file_path);
 
@@ -616,12 +614,11 @@ test "getRandomLeaf - empty leafCount returns default" {
 }
 
 test "saveToFile functionality" {
-    const test_alloc = std.testing.allocator;
     const test_file = "test_save.dat";
     const io = std.Io.Threaded.global_single_threaded.io();
 
     // Test writing to file
-    try saveToFile(io, test_alloc, test_file, 12345, 67);
+    try saveToFile(io, test_file, 12345, 67);
 
     // Verify file contents
     const file = try std.Io.Dir.cwd().openFile(io, test_file, .{});
@@ -638,12 +635,11 @@ test "saveToFile functionality" {
 }
 
 test "loadFromFile functionality" {
-    const test_alloc = std.testing.allocator;
     const test_file = "test_load.dat";
     const io = std.Io.Threaded.global_single_threaded.io();
 
     // First save a file
-    try saveToFile(io, test_alloc, test_file, 99999, 42);
+    try saveToFile(io, test_file, 99999, 42);
 
     // Now load it back
     const loaded = try loadFromFile(io, test_file);
@@ -662,12 +658,11 @@ test "loadFromFile - file not found returns error" {
 }
 
 test "saveToFile creates parent directories" {
-    const test_alloc = std.testing.allocator;
     const test_file = "test_subdir/nested/test_save.dat";
     const io = std.Io.Threaded.global_single_threaded.io();
 
     // This should create the directories and the file
-    try saveToFile(io, test_alloc, test_file, 11111, 22);
+    try saveToFile(io, test_file, 11111, 22);
 
     // Verify it worked by loading
     const loaded = try loadFromFile(io, test_file);

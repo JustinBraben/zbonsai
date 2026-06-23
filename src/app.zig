@@ -1,6 +1,5 @@
 //! src/app.zig
 const std = @import("std");
-const testing = std.testing;
 const mem = std.mem;
 const Allocator = mem.Allocator;
 
@@ -10,7 +9,6 @@ const Styles = @import("styles.zig");
 const Dice = @import("dice.zig");
 
 const vaxis = @import("vaxis");
-const clap = @import("clap");
 
 pub const BranchType = enum {
     trunk,
@@ -81,7 +79,7 @@ pub fn run(self: *App) !void {
     try self.vx.enterAltScreen(self.tty.writer());
     try self.vx.queryTerminal(self.tty.writer(), .fromSeconds(1));
 
-    var myCounters: Counters = .{};
+    var counters: Counters = .{};
 
     // Outer loop for infinite mode - grows trees repeatedly
     while (!self.should_quit) {
@@ -91,7 +89,7 @@ pub fn run(self: *App) !void {
         while (!self.should_quit) {
             // tryEvent returns events if one is available
             while (try self.loop.tryEvent()) |event| {
-                try self.update(event, &myCounters, &pass_finished);
+                try self.update(event, &counters, &pass_finished);
             }
 
             // Grow the tree
@@ -100,7 +98,7 @@ pub fn run(self: *App) !void {
                 win.clear();
                 try self.drawWins();
                 try self.drawMessage();
-                try self.growTree(&myCounters);
+                try self.growTree(&counters);
                 pass_finished = true;
             }
 
@@ -140,7 +138,7 @@ pub fn run(self: *App) !void {
             if (!self.should_quit) {
                 const new_seed = @as(u64, @intCast(std.Io.Clock.real.now(self.io).toSeconds()));
                 self.dice = Dice.init(new_seed);
-                myCounters = .{};
+                counters = .{};
             }
         }
     }
@@ -148,19 +146,14 @@ pub fn run(self: *App) !void {
     // Save tree state if --save flag was passed
     if (self.args.save) {
         if (self.args.seed) |seed| {
-            Args.saveToFile(self.io, self.allocator, self.args.saveFile, seed, myCounters.branches) catch |err| {
+            Args.saveToFile(self.io, self.args.saveFile, seed, counters.branches) catch |err| {
                 std.debug.print("Warning: Could not save to {s}: {}\n", .{ self.args.saveFile, err });
             };
         }
     }
 
-    // Drain any pending events/responses from terminal
-    // TODO: Much worse response time on macos-aarch64, sleep for now
-    // self.loop.pollEvent();
-
     // Handle print mode - no alt screen, just direct output
     if (self.args.printTree) {
-        // std.debug.print("Window size: {}x{}\n", .{self.vx.window().width, self.vx.window().height});
         try self.vx.exitAltScreen(self.tty.writer());
         try self.vx.prettyPrint(self.tty.writer());
         std.Io.sleep(self.io, std.Io.Duration.fromMilliseconds(20), .real) catch {};
@@ -168,7 +161,7 @@ pub fn run(self: *App) !void {
 }
 
 /// Update our application state from an event
-pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *bool) !void {
+pub fn update(self: *App, event: Event, counters: *Counters, pass_finished: *bool) !void {
     switch (event) {
         .key_press => |key| {
             // In screensaver mode, quit on any keypress
@@ -185,8 +178,8 @@ pub fn update(self: *App, event: Event, myCounters: *Counters, pass_finished: *b
                 win.clear();
                 try self.drawWins();
                 try self.drawMessage();
-                myCounters.* = .{}; // Reset counters
-                try self.growTree(myCounters);
+                counters.* = .{}; // Reset counters
+                try self.growTree(counters);
                 pass_finished.* = true; // Mark as finished to avoid duplicate drawing
             } else {
                 self.initial_resize_handled = true;
@@ -222,7 +215,6 @@ pub fn updateScreen(self: *App, io: std.Io, timeStep: f32) !void {
 
         if (!self.should_quit) {
             const sleep_time: u64 = @min(check_interval_ms, ms - waited);
-            // std.Thread.sleep(sleep_time * std.time.ns_per_ms);
             try io.sleep(.fromMilliseconds(@as(i64, @intCast(sleep_time))), .awake);
             waited += sleep_time;
         }
@@ -233,35 +225,6 @@ pub fn updateScreen(self: *App, io: std.Io, timeStep: f32) !void {
 pub fn renderScreen(self: *App) !void {
     try self.vx.render(self.tty.writer());
     try self.tty.writer().flush();
-}
-
-/// For debugging, used to view args values in the terminal window
-pub fn drawConfig(self: *App) !void {
-    const win = self.vx.window();
-
-    const msg = try std.fmt.bufPrint(
-        &self.debug_buffer,
-        \\live: {}
-        \\infinite: {}
-        \\screensaver: {}
-        \\printTree: {}
-        \\seed: {d}
-        \\saveFile: {s}
-        \\loadFile: {s}
-        \\leafCount: {d}
-    ,
-        .{
-            self.args.live,
-            self.args.infinite,
-            self.args.screensaver,
-            self.args.printTree,
-            self.args.seed,
-            self.args.saveFile,
-            self.args.loadFile,
-            self.args.leafCount,
-        },
-    );
-    _ = win.printSegment(.{ .text = msg[0..], .style = .{} }, .{});
 }
 
 fn drawWins(self: *App) !void {
@@ -406,80 +369,33 @@ fn drawMessage(self: *App) !void {
     }
 }
 
-/// Used to debug initial tree drawing placement
-fn drawTree(self: *App) !void {
-    const win = self.vx.window();
-
-    switch (self.args.baseType) {
-        .none => {
-            const x_pos = (self.getTreeWinMaxX() / 2) -| 1;
-            const y_pos = self.getTreeWinMaxY();
-            const y_max = self.getTreeWinMaxY();
-
-            const tree_child = win.child(.{
-                .x_off = x_pos,
-                .y_off = y_pos,
-                .height = .{ .limit = y_max },
-            });
-
-            _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
-        },
-        .small => {
-            const x_pos = (self.getTreeWinMaxX() / 2) -| 1;
-            const y_pos = self.getTreeWinMaxY();
-            const y_max = self.getTreeWinMaxY();
-
-            const tree_child = win.child(.{
-                .x_off = x_pos,
-                .y_off = y_pos,
-                .height = .{ .limit = y_max },
-            });
-
-            _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
-        },
-        .large => {
-            const x_pos = (self.getTreeWinMaxX() / 2) -| 1;
-            const y_pos = self.getTreeWinMaxY();
-            const y_max = self.getTreeWinMaxY();
-
-            const tree_child = win.child(.{
-                .x_off = x_pos,
-                .y_off = y_pos,
-                .height = .{ .limit = y_max },
-            });
-
-            _ = tree_child.printSegment(.{ .text = "/~\\", .style = Styles.tree_base_style }, .{});
-        },
-    }
-}
-
 /// Gets the starting position to grow the tree,
 /// calls self.branch which recursively draws the tree
-fn growTree(self: *App, myCounters: *Counters) !void {
+fn growTree(self: *App, counters: *Counters) !void {
     var maxX: u16 = 0;
     var maxY: u16 = 0;
 
     maxX = self.getTreeWinMaxX();
     maxY = self.getTreeWinMaxY();
 
-    myCounters.*.shoots = 0;
-    myCounters.*.branches = 0;
-    myCounters.*.shootCounter = self.dice.rollUsize(std.math.maxInt(u3));
+    counters.*.shoots = 0;
+    counters.*.branches = 0;
+    counters.*.shootCounter = self.dice.rollUsize(std.math.maxInt(u3));
 
     // recursively grow tree trunk and branches
-    try self.branch(myCounters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
+    try self.branch(counters, (maxX / 2), (maxY), .trunk, self.args.lifeStart);
 
     const win = self.vx.window();
     if (win.screen.cursor_vis) win.hideCursor();
 }
 
 /// Recursively draws the parts of the tree
-fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_type: BranchType, life_input: usize) !void {
+fn branch(self: *App, counters: *Counters, x_input: u16, y_input: u16, branch_type: BranchType, life_input: usize) !void {
     var x = x_input;
     var y = y_input;
     var life = life_input;
 
-    myCounters.*.branches +|= 1;
+    counters.*.branches +|= 1;
     var dx: i64 = 0;
     var dy: i64 = 0;
     var age: usize = 0;
@@ -521,15 +437,15 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
 
         // near-dead branch should branch into a lot of leaves
         if (life < 3) {
-            try self.branch(myCounters, x, y, .dead, life);
+            try self.branch(counters, x, y, .dead, life);
         }
         // dying trunk should branch into a lot of leaves
         else if (branch_type == .trunk and life < (self.args.multiplier +| 2)) {
-            try self.branch(myCounters, x, y, .dying, life);
+            try self.branch(counters, x, y, .dying, life);
         }
         // dying shoot should branch into a lot of leaves
         else if ((branch_type == .shootLeft or branch_type == .shootRight) and life < (self.args.multiplier +| 2)) {
-            try self.branch(myCounters, x, y, .dying, life);
+            try self.branch(counters, x, y, .dying, life);
         } else if ((branch_type == .trunk and self.dice.rollUsize(3) == 0) or
             (life % self.args.multiplier == 0))
         {
@@ -538,21 +454,21 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
 
                 const life_offset = self.dice.rollI64(5) - 2;
                 if (life_offset < 0) {
-                    try self.branch(myCounters, x, y, .trunk, life -| @as(usize, @abs(life_offset)));
+                    try self.branch(counters, x, y, .trunk, life -| @as(usize, @abs(life_offset)));
                 } else {
-                    try self.branch(myCounters, x, y, .trunk, life +| @as(usize, @intCast(life_offset)));
+                    try self.branch(counters, x, y, .trunk, life +| @as(usize, @intCast(life_offset)));
                 }
             } else if (shootCooldown == 0) {
                 shootCooldown = self.args.multiplier * 2;
 
-                myCounters.*.shoots +|= 1;
-                myCounters.*.shootCounter +|= 1;
+                counters.*.shoots +|= 1;
+                counters.*.shootCounter +|= 1;
 
                 // 50/50 branch shootLeft or shootRight
                 if (self.dice.rollUsize(2) == 0) {
-                    try self.branch(myCounters, x, y, .shootLeft, (life +| self.args.multiplier));
+                    try self.branch(counters, x, y, .shootLeft, (life +| self.args.multiplier));
                 } else {
-                    try self.branch(myCounters, x, y, .shootRight, (life +| self.args.multiplier));
+                    try self.branch(counters, x, y, .shootRight, (life +| self.args.multiplier));
                 }
             }
         }
@@ -623,7 +539,7 @@ fn branch(self: *App, myCounters: *Counters, x_input: u16, y_input: u16, branch_
 
         // if live, update screen
         // skip updating if we're still loading from file
-        if (self.args.live and !(self.args.load and myCounters.*.branches < self.args.targetBranchCount)) {
+        if (self.args.live and !(self.args.load and counters.*.branches < self.args.targetBranchCount)) {
             try self.updateScreen(self.io, self.args.timeStep);
         }
     }

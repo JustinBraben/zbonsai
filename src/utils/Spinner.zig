@@ -20,14 +20,7 @@ const posix_characters = &[_][]const u8{
     "⠏",
 };
 
-const windows_characters = &[_][]const u8{
-    "+",
-    "-",
-    "x",
-    "|",
-};
-
-/// character to use for the Progressbar
+/// character to display
 character: vaxis.Cell.Character = .{ .grapheme = "+", .width = 1 },
 
 /// style to draw the bar character with
@@ -40,9 +33,6 @@ height: usize = 1,
 index: usize = 0,
 
 pub fn draw(self: Spinner, win: vaxis.Window) void {
-    // Only height of 1 windows are supported for now
-    // if (win.height != 1 or win.width != 0) return;
-
     win.writeCell(0, 0, .{ .char = self.character, .style = self.style });
 }
 

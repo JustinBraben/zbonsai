@@ -1,7 +1,5 @@
 //! src/main.zig
 const std = @import("std");
-const mem = std.mem;
-const Allocator = mem.Allocator;
 
 const Args = @import("args.zig");
 const App = @import("app.zig");
@@ -9,7 +7,7 @@ const App = @import("app.zig");
 pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.c_allocator;
 
-    var args = try Args.parse_args(init, allocator);
+    var args = try Args.parseArgs(init, allocator);
     defer args.deinit();
 
     // If -h was passed help will be displayed

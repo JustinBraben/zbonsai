@@ -58,8 +58,4 @@ pub fn build(b: *std.Build) void {
     const run_unit_tests = b.addRunArtifact(unit_tests);
     test_step.dependOn(&run_unit_tests.step);
 
-    // Create "all" step
-    // const all_step = b.step("all", "Build everything and runs all tests");
-    // all_step.dependOn(main_step);
-    // b.default_step.dependOn(all_step);
 }
