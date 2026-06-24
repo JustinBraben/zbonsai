@@ -546,7 +546,7 @@ fn branch(self: *App, counters: *Counters, x_input: u16, y_input: u16, branch_ty
 }
 
 /// Determine which way the tree shoot draw towards
-fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
+fn setDeltasFn(rng: *Dice, branch_type: BranchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
     var dice: i64 = 0;
 
     switch (branch_type) {
@@ -554,14 +554,14 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             // Base trunk - straighter with slight variations
             if (age <= 2 or life < 4) {
                 returnDy.* = 0; // More consistent upward growth at start
-                returnDx.* = self.dice.rollI64(3) - 1; // Slight left/right variation
+                returnDx.* = rng.rollI64(3) - 1; // Slight left/right variation
             }
             // Young trunk should grow more upward with some width
             else if (age < (multiplier * 3)) {
                 // More consistent upward growth for young trunk
                 if (age % 2 == 0) returnDy.* = -1 else returnDy.* = 0;
 
-                dice = self.dice.rollI64(12);
+                dice = rng.rollI64(12);
                 if (dice >= 0 and dice <= 1) {
                     returnDx.* = -2; // Occasional strong left
                 } else if (dice >= 2 and dice <= 4) {
@@ -576,7 +576,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             }
             // Middle-aged trunk - more upward growth
             else {
-                dice = self.dice.rollI64(10);
+                dice = rng.rollI64(10);
                 if (dice > 1) {
                     returnDy.* = -1; // More consistent upward growth (80%)
                 } else {
@@ -584,8 +584,8 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
                 }
 
                 // Less horizontal movement for mature trunk
-                returnDx.* = if (self.dice.rollI64(5) == 0)
-                    self.dice.rollI64(3) - 1 // Occasional horizontal movement
+                returnDx.* = if (rng.rollI64(5) == 0)
+                    rng.rollI64(3) - 1 // Occasional horizontal movement
                 else
                     0; // Usually straight up for mature trunk
             }
@@ -593,7 +593,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
         // Shoots trend left or right with some vertical variation
         .shootLeft => {
             // More sophisticated vertical movement
-            dice = self.dice.rollI64(12);
+            dice = rng.rollI64(12);
             if (dice >= 0 and dice <= 2) {
                 returnDy.* = -1; // 25% chance to grow upward
             } else if (dice >= 3 and dice <= 8) {
@@ -603,7 +603,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             }
 
             // Strong left bias for left shoots
-            dice = self.dice.rollI64(12);
+            dice = rng.rollI64(12);
             if (dice >= 0 and dice <= 2) {
                 returnDx.* = -2; // Strong left
             } else if (dice >= 3 and dice <= 7) {
@@ -616,7 +616,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
         },
         .shootRight => {
             // Similar vertical movement as shootLeft
-            dice = self.dice.rollI64(12);
+            dice = rng.rollI64(12);
             if (dice >= 0 and dice <= 2) {
                 returnDy.* = -1; // 25% chance to grow upward
             } else if (dice >= 3 and dice <= 8) {
@@ -626,7 +626,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             }
 
             // Strong right bias for right shoots
-            dice = self.dice.rollI64(12);
+            dice = rng.rollI64(12);
             if (dice >= 0 and dice <= 2) {
                 returnDx.* = 2; // Strong right
             } else if (dice >= 3 and dice <= 7) {
@@ -640,7 +640,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
         // Dying branches - more random for leaf clusters
         .dying => {
             // More vertical variation for leaf clusters
-            dice = self.dice.rollI64(15);
+            dice = rng.rollI64(15);
             if (dice >= 0 and dice <= 4) {
                 returnDy.* = -1; // 33% up
             } else if (dice >= 5 and dice <= 9) {
@@ -650,7 +650,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             }
 
             // Wide horizontal spread for foliage
-            dice = self.dice.rollI64(15);
+            dice = rng.rollI64(15);
             if (dice == 0) {
                 returnDx.* = -3;
             } else if (dice >= 1 and dice <= 3) {
@@ -670,7 +670,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
         // Dead branches - leaf endpoints
         .dead => {
             // Even distribution of directions for leaves
-            dice = self.dice.rollI64(12);
+            dice = rng.rollI64(12);
             if (dice >= 0 and dice <= 3) {
                 returnDy.* = -1; // 33% up
             } else if (dice >= 4 and dice <= 7) {
@@ -680,7 +680,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
             }
 
             // Wide but controlled spread
-            dice = self.dice.rollI64(5);
+            dice = rng.rollI64(5);
             returnDx.* = dice - 2; // Range from -2 to +2
         },
     }
@@ -688,7 +688,7 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
     // Age-based adjustments to prevent excessive width for old trunks
     if (branch_type == .trunk and age > multiplier * 5) {
         // Bias toward upward growth for older trunks
-        if (self.dice.rollI64(10) > 2) {
+        if (rng.rollI64(10) > 2) {
             returnDy.* = -1;
             returnDx.* = 0;
         }
@@ -705,6 +705,10 @@ fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multi
     } else if (returnDy.* < -1) {
         returnDy.* = -1;
     }
+}
+
+fn setDeltas(self: *App, branch_type: BranchType, life: usize, age: usize, multiplier: usize, returnDx: *i64, returnDy: *i64) void {
+    setDeltasFn(&self.dice, branch_type, life, age, multiplier, returnDx, returnDy);
 }
 
 /// Return vaxis style for color of tree parts
@@ -762,8 +766,7 @@ inline fn chooseColor(self: *App, branch_type: BranchType) vaxis.Style {
     }
 }
 
-/// Return a String for the tree branch or leaf
-fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) []const u8 {
+fn chooseStringFn(rng: *Dice, leaf_count: usize, leaf_strings: []const []const u8, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) []const u8 {
     var branch_type = branch_type_input;
     if (life < 4) branch_type = .dying;
 
@@ -771,13 +774,13 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
         .trunk => {
             if (dy < 0) { // Going up
                 if (dx < 0) { // Up and left
-                    return if (self.dice.rollI64(2) == 0) "/|" else "\\|";
+                    return if (rng.rollI64(2) == 0) "/|" else "\\|";
                 } else if (dx == 0) { // Straight up
                     const choices = [_][]const u8{ "|", "│", "║", "/|\\", "/|", "|\\", "|" };
-                    const idx = self.dice.rollUsize(choices.len);
+                    const idx = rng.rollUsize(choices.len);
                     return choices[idx];
                 } else { // Up and right
-                    return if (self.dice.rollI64(2) == 0) "|/" else "|\\";
+                    return if (rng.rollI64(2) == 0) "|/" else "|\\";
                 }
             } else if (dy == 0) { // Horizontal
                 if (dx < 0) { // Left
@@ -794,11 +797,11 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
         .shootLeft => {
             if (dy < 0) { // Up and left
                 const choices = [_][]const u8{ "/", "\\|", "\\" };
-                const idx = self.dice.rollUsize(choices.len);
+                const idx = rng.rollUsize(choices.len);
                 return choices[idx];
             } else if (dy == 0) { // Horizontal left
                 const choices = [_][]const u8{ "\\_", "\\", "\\~" };
-                const idx = self.dice.rollUsize(choices.len);
+                const idx = rng.rollUsize(choices.len);
                 return choices[idx];
             } else { // Down and left
                 return "\\";
@@ -807,25 +810,29 @@ fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64,
         .shootRight => {
             if (dy < 0) { // Up and right
                 const choices = [_][]const u8{ "\\", "|/", "/" };
-                const idx = self.dice.rollUsize(choices.len);
+                const idx = rng.rollUsize(choices.len);
                 return choices[idx];
             } else if (dy == 0) { // Horizontal right
                 const choices = [_][]const u8{ "_/", "/", "~/" };
-                const idx = self.dice.rollUsize(choices.len);
+                const idx = rng.rollUsize(choices.len);
                 return choices[idx];
             } else { // Down and right
                 return "/";
             }
         },
         .dying, .dead => {
-            // Use the parsed leaf strings from args
-            if (self.args.leafCount == 0) {
+            if (leaf_count == 0) {
                 return "&";
             }
-            const idx = self.dice.rollUsize(self.args.leafCount);
-            return self.args.leafStrings[idx];
+            const idx = rng.rollUsize(leaf_count);
+            return leaf_strings[idx];
         },
     }
+}
+
+/// Return a String for the tree branch or leaf
+fn chooseString(self: *App, branch_type_input: BranchType, life: usize, dx: i64, dy: i64) []const u8 {
+    return chooseStringFn(&self.dice, self.args.leafCount, self.args.leafStrings[0..self.args.leafCount], branch_type_input, life, dx, dy);
 }
 
 /// Get Max Y bounds for the tree, based on baseType
@@ -846,4 +853,64 @@ fn getTreeWinMaxX(self: *App) u16 {
     return switch (self.args.baseType) {
         .none, .small, .large => (win.width),
     };
+}
+
+test "setDeltas - dx and dy always clamped to [-1, 1]" {
+    var rng = Dice.init(42);
+    const all_types = [_]BranchType{ .trunk, .shootLeft, .shootRight, .dying, .dead };
+
+    for (all_types) |branch_type| {
+        for (0..50) |i| {
+            var dx: i64 = 0;
+            var dy: i64 = 0;
+            setDeltasFn(&rng, branch_type, i % 20, i, 5, &dx, &dy);
+            try std.testing.expect(dx >= -1 and dx <= 1);
+            try std.testing.expect(dy >= -1 and dy <= 1);
+        }
+    }
+}
+
+test "chooseString - life < 4 forces dying path" {
+    var rng = Dice.init(0);
+    const leaf_strings = [_][]const u8{"*"};
+
+    // trunk with life=2: life < 4 forces .dying branch type → returns leaf
+    const result = chooseStringFn(&rng, 1, &leaf_strings, .trunk, 2, 0, -1);
+    try std.testing.expectEqualStrings("*", result);
+}
+
+test "chooseString - shootLeft horizontal returns backslash variant" {
+    var rng = Dice.init(42);
+    const leaf_strings = [_][]const u8{"&"};
+    const valid = [_][]const u8{ "\\_", "\\", "\\~" };
+
+    for (0..20) |_| {
+        const result = chooseStringFn(&rng, 1, &leaf_strings, .shootLeft, 10, -1, 0);
+        var found = false;
+        for (valid) |v| {
+            if (std.mem.eql(u8, result, v)) {
+                found = true;
+                break;
+            }
+        }
+        try std.testing.expect(found);
+    }
+}
+
+test "chooseString - shootRight horizontal returns slash variant" {
+    var rng = Dice.init(42);
+    const leaf_strings = [_][]const u8{"&"};
+    const valid = [_][]const u8{ "_/", "/", "~/" };
+
+    for (0..20) |_| {
+        const result = chooseStringFn(&rng, 1, &leaf_strings, .shootRight, 10, 1, 0);
+        var found = false;
+        for (valid) |v| {
+            if (std.mem.eql(u8, result, v)) {
+                found = true;
+                break;
+            }
+        }
+        try std.testing.expect(found);
+    }
 }

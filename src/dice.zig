@@ -73,3 +73,17 @@ test "Dice rollF32 returns values in [0, 1)" {
         try testing.expect(f >= 0.0 and f < 1.0);
     }
 }
+
+test "Dice rollUsize(1) always returns 0" {
+    var dice = Dice.init(42);
+    for (0..100) |_| {
+        try testing.expectEqual(@as(usize, 0), dice.rollUsize(1));
+    }
+}
+
+test "Dice rollI64(1) always returns 0" {
+    var dice = Dice.init(42);
+    for (0..100) |_| {
+        try testing.expectEqual(@as(i64, 0), dice.rollI64(1));
+    }
+}

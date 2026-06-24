@@ -745,3 +745,50 @@ test "parseColors - negative color value" {
     const result = parseColors("1,2,-3,4");
     try std.testing.expectError(ArgsError.InvalidColorValue, result);
 }
+
+test "loadFromFile - empty file returns EmptyFile error" {
+    const test_file = "test_empty_file.dat";
+    const io = std.Io.Threaded.global_single_threaded.io();
+    defer std.Io.Dir.cwd().deleteFile(io, test_file) catch {};
+
+    {
+        const file = try std.Io.Dir.cwd().createFile(io, test_file, .{});
+        file.close(io);
+    }
+
+    try std.testing.expectError(error.EmptyFile, loadFromFile(io, test_file));
+}
+
+test "loadFromFile - missing branch count returns InvalidFileFormat" {
+    const test_file = "test_one_token.dat";
+    const io = std.Io.Threaded.global_single_threaded.io();
+    defer std.Io.Dir.cwd().deleteFile(io, test_file) catch {};
+
+    {
+        const file = try std.Io.Dir.cwd().createFile(io, test_file, .{});
+        defer file.close(io);
+        var buf: [64]u8 = undefined;
+        var writer = file.writer(io, &buf);
+        try writer.interface.print("12345", .{});
+        try writer.interface.flush();
+    }
+
+    try std.testing.expectError(error.InvalidFileFormat, loadFromFile(io, test_file));
+}
+
+test "loadFromFile - non-numeric seed returns parse error" {
+    const test_file = "test_bad_seed.dat";
+    const io = std.Io.Threaded.global_single_threaded.io();
+    defer std.Io.Dir.cwd().deleteFile(io, test_file) catch {};
+
+    {
+        const file = try std.Io.Dir.cwd().createFile(io, test_file, .{});
+        defer file.close(io);
+        var buf: [64]u8 = undefined;
+        var writer = file.writer(io, &buf);
+        try writer.interface.print("abc 42", .{});
+        try writer.interface.flush();
+    }
+
+    try std.testing.expectError(error.InvalidCharacter, loadFromFile(io, test_file));
+}
