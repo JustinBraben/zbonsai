@@ -9,10 +9,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const clap = b.dependency("clap", .{
-        .target = target,
-        .optimize = optimize,
-    });
+    const clap = b.dependency("clap", .{});
     const clap_mod = clap.module("clap");
 
     const vaxis = b.dependency("vaxis", .{

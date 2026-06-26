@@ -365,17 +365,17 @@ fn createDefaultCachePath(environ_map: *const std.process.Environ.Map, ally: All
         }
     } else if (builtin.os.tag == .macos) {
         // macOS: Use ~/Library/Application Support/zbonsai/
-        if (std.posix.getenv("HOME")) |home| {
+        if (environ_map.get("HOME")) |home| {
             const path = try std.fs.path.join(ally, &.{ home, "Library", "Application Support", "zbonsai", "zbonsai.dat" });
             return path;
         }
     } else {
         // Linux/Unix: Follow XDG Base Directory Specification
         // First try XDG_CACHE_HOME, then fall back to ~/.cache
-        if (std.posix.getenv("XDG_CACHE_HOME")) |cache_home| {
+        if (environ_map.get("XDG_CACHE_HOME")) |cache_home| {
             const path = try std.fs.path.join(ally, &.{ cache_home, "zbonsai" });
             return path;
-        } else if (std.posix.getenv("HOME")) |home| {
+        } else if (environ_map.get("HOME")) |home| {
             const path = try std.fs.path.join(ally, &.{ home, ".cache", "zbonsai" });
             return path;
         }
